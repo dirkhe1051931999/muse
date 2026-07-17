@@ -149,12 +149,18 @@ func LoadFile() (fileConfig, error) {
 	return cfg, nil
 }
 
-func InitFile() (string, error) {
+func InitFile(overwrite bool) (string, error) {
 	path, err := Path()
 	if err != nil {
 		return "", err
 	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	flag := os.O_WRONLY | os.O_CREATE
+	if overwrite {
+		flag |= os.O_TRUNC
+	} else {
+		flag |= os.O_EXCL
+	}
+	file, err := os.OpenFile(path, flag, 0600)
 	if err != nil {
 		return "", err
 	}

@@ -122,3 +122,15 @@ func (c Client) CommitWithFile(ctx context.Context, path string) error {
 	_, err := c.Run(ctx, "commit", "-F", path)
 	return err
 }
+
+func (c Client) Push(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "git", "push")
+	cmd.Dir = c.Dir
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git push: %w", err)
+	}
+	return nil
+}

@@ -53,7 +53,7 @@ func TestInitFileCreatesExample(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	path, err := InitFile()
+	path, err := InitFile(false)
 	if err != nil {
 		t.Fatalf("init config: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestInitFileCreatesExample(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("stat config: %v", err)
 	}
-	if _, err := InitFile(); err != nil {
+	if _, err := InitFile(true); err != nil {
 		t.Fatalf("overwrite config: %v", err)
 	}
 }

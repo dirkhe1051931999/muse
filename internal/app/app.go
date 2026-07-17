@@ -1,9 +1,13 @@
 package app
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"git-muse/internal/commitmsg"
@@ -46,7 +50,7 @@ func RunInteractive(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	final, ok, err := ui.Choose(ctx, client, msg, ctxData.Diff, generate)
+	final, ok, push, err := ui.Choose(ctx, client, msg, ctxData.Diff, generate)
 	if err != nil {
 		return err
 	}
@@ -54,11 +58,17 @@ func RunInteractive(ctx context.Context) error {
 		fmt.Println("Cancelled.")
 		return nil
 	}
-	if !ui.Confirm(final) {
+	if !ui.Confirm(final, push) {
 		fmt.Println("Cancelled.")
 		return nil
 	}
-	return commitWithMessage(ctx, client, final)
+	if err := commitWithMessage(ctx, client, final); err != nil {
+		return err
+	}
+	if push {
+		return client.Push(ctx)
+	}
+	return nil
 }
 
 func RunGenerate(ctx context.Context) error {
@@ -123,13 +133,30 @@ func RunInspect(ctx context.Context) error {
 	return nil
 }
 
-func RunInit() error {
-	path, err := config.InitFile()
+func RunInit(ctx context.Context) error {
+	path, err := config.Path()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Wrote %s\n", path)
-	fmt.Println("Edit apiKey before running git muse.")
+	overwrite := true
+	if _, err := os.Stat(path); err == nil {
+		overwrite = confirmOverwrite(path)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if overwrite {
+		path, err = config.InitFile(true)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Wrote %s\n", path)
+		fmt.Println("Edit apiKey before running git muse.")
+	} else {
+		fmt.Printf("Skipped %s\n", path)
+	}
+	if err := addExeDirToUserPath(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "PATH update skipped: %v\n", err)
+	}
 	return nil
 }
 
@@ -214,4 +241,85 @@ func statusValue(value string) string {
 		return "not configured"
 	}
 	return value
+}
+
+func confirmOverwrite(path string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s already exists. Overwrite? [y/N]\n", path)
+	fmt.Print("> ")
+	answer, _ := reader.ReadString('\n')
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "y" || answer == "yes"
+}
+
+func addExeDirToUserPath(ctx context.Context) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(exe)
+	if isGoRunDir(dir) {
+		return fmt.Errorf("go run uses temporary executable path; build or run git-muse.exe to update PATH")
+	}
+	current, err := userPath(ctx)
+	if err != nil {
+		return err
+	}
+	next := prependPath(current, dir)
+	if next == current {
+		fmt.Printf("PATH already contains %s\n", dir)
+		return nil
+	}
+	if err := setUserPath(ctx, next); err != nil {
+		return err
+	}
+	fmt.Printf("Added %s to user PATH\n", dir)
+	return nil
+}
+
+func userPath(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", "[Environment]::GetEnvironmentVariable('Path', 'User')")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func setUserPath(ctx context.Context, value string) error {
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", "[Environment]::SetEnvironmentVariable('Path', $args[0], 'User')", value)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return fmt.Errorf("set user PATH: %s", msg)
+	}
+	return nil
+}
+
+func prependPath(pathValue, dir string) string {
+	parts := strings.Split(pathValue, ";")
+	out := []string{dir}
+	seen := map[string]bool{strings.ToLower(filepath.Clean(dir)): true}
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		key := strings.ToLower(filepath.Clean(part))
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, part)
+	}
+	return strings.Join(out, ";")
+}
+
+func isGoRunDir(dir string) bool {
+	dir = strings.ToLower(filepath.Clean(dir))
+	return strings.Contains(dir, string(filepath.Separator)+"go-build")
 }
