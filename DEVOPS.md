@@ -100,7 +100,7 @@ git: 'muse' is not a git command
 2. `go test ./...`
 3. 本机构建 smoke binary
 
-push 到 `ambisonic` 且 CI 成功后，会继续执行 release：
+push 到 `ambisonic` 且 CI 成功后，只有本次 push 包含 `.build_run` 变更，才会继续执行 release：
 
 1. 读取现有 `vX.Y.Z` tag。
 2. 若当前 commit 已有版本 tag，复用该 tag。
@@ -108,6 +108,17 @@ push 到 `ambisonic` 且 CI 成功后，会继续执行 release：
 4. 构建多平台压缩包。
 5. 生成 `checksums.txt`。
 6. 发布 GitHub Release。
+
+普通代码提交不会打包发版。需要发版时，修改根目录 `.build_run` 后提交即可。
+
+例如：
+
+```bash
+date -u +%Y-%m-%dT%H:%M:%SZ > .build_run
+git add .build_run
+git commit -m "chore: trigger release"
+git push origin ambisonic
+```
 
 当前构建目标：
 
@@ -200,6 +211,19 @@ git muse help
 - `muse.baseUrl`
 - API key 环境变量
 - 本机网络或 Ollama 服务状态
+
+Ollama 本地验证：
+
+```bash
+ollama list
+curl http://localhost:11434/api/tags
+```
+
+OpenAI-compatible 验证：
+
+```bash
+echo $OPENAI_API_KEY
+```
 
 ### Commit 失败
 

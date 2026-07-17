@@ -14,9 +14,16 @@ type Context struct {
 	Status         string
 	Stat           string
 	Diff           string
+	Excluded       []ExcludedFile
+	Truncated      bool
 }
 
-func Collect(ctx context.Context, client git.Client) (Context, error) {
+type ExcludedFile struct {
+	Path   string
+	Reason string
+}
+
+func Collect(ctx context.Context, client git.Client, maxBytes int) (Context, error) {
 	diff, err := client.StagedDiff(ctx)
 	if err != nil {
 		return Context{}, err
@@ -24,6 +31,8 @@ func Collect(ctx context.Context, client git.Client) (Context, error) {
 	if strings.TrimSpace(diff) == "" {
 		return Context{}, fmt.Errorf("no staged changes found\n\nStage files first:\n\n  git add <files>")
 	}
+
+	filteredDiff, excluded, truncated := Filter(diff, maxBytes)
 
 	stat, err := client.StagedStat(ctx)
 	if err != nil {
@@ -41,6 +50,8 @@ func Collect(ctx context.Context, client git.Client) (Context, error) {
 		RecentSubjects: recent,
 		Status:         status,
 		Stat:           stat,
-		Diff:           diff,
+		Diff:           filteredDiff,
+		Excluded:       excluded,
+		Truncated:      truncated,
 	}, nil
 }
