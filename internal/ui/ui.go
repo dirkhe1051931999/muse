@@ -12,48 +12,54 @@ import (
 	"git-muse/internal/git"
 )
 
-func Choose(ctx context.Context, client git.Client, message string, diff string, regenerate func() (string, error)) (string, bool, error) {
+func Choose(ctx context.Context, client git.Client, message string, diff string, regenerate func() (string, error)) (string, bool, bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Println("Suggested commit message:")
 		fmt.Println()
 		fmt.Print(message)
 		fmt.Println()
-		fmt.Println("[c] commit  [e] edit  [r] regenerate  [v] view diff  [q] quit")
+		fmt.Println("[c] commit  [p] commit and push  [e] edit  [r] regenerate  [v] view diff  [q] quit")
 		fmt.Print("> ")
 
 		choice, _ := reader.ReadString('\n')
 		switch strings.ToLower(strings.TrimSpace(choice)) {
 		case "c", "commit":
-			return message, true, nil
+			return message, true, false, nil
+		case "p", "push", "commit and push":
+			return message, true, true, nil
 		case "e", "edit":
 			edited, err := Edit(ctx, client, message)
 			if err != nil {
-				return "", false, err
+				return "", false, false, err
 			}
 			if strings.TrimSpace(edited) == "" {
-				return "", false, fmt.Errorf("commit message is empty")
+				return "", false, false, fmt.Errorf("commit message is empty")
 			}
-			return edited, true, nil
+			return edited, true, false, nil
 		case "r", "regenerate":
 			next, err := regenerate()
 			if err != nil {
-				return "", false, err
+				return "", false, false, err
 			}
 			message = next
 		case "v", "view":
 			fmt.Println(diff)
 		case "q", "quit", "":
-			return "", false, nil
+			return "", false, false, nil
 		default:
 			fmt.Println("Unknown choice.")
 		}
 	}
 }
 
-func Confirm(message string) bool {
+func Confirm(message string, push bool) bool {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Commit with this message?")
+	if push {
+		fmt.Println("Commit and push with this message?")
+	} else {
+		fmt.Println("Commit with this message?")
+	}
 	fmt.Println()
 	fmt.Print(message)
 	fmt.Println("[y/N]")

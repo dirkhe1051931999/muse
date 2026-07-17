@@ -36,7 +36,7 @@ func run(ctx context.Context, args []string) error {
 
 	switch args[0] {
 	case "init":
-		return app.RunInit()
+		return app.RunInit(ctx)
 	case "generate":
 		return app.RunGenerate(ctx)
 	case "inspect":
