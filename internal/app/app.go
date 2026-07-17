@@ -50,7 +50,7 @@ func RunInteractive(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	final, ok, push, err := ui.Choose(ctx, client, msg, ctxData.Diff, generate)
+	final, ok, push, err := ui.Choose(ctx, client, msg, generate)
 	if err != nil {
 		return err
 	}
