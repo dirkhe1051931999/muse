@@ -41,3 +41,27 @@
 1. 按 `plan` 完成 MVP：新增 Git config 配置读取、Ollama / OpenAI-compatible provider、prompt 构造和严格 JSON 候选解析。
 2. 接通 `git muse generate`、`git muse inspect`、`git muse doctor` 和默认交互提交流程，最终通过 `git commit -F` 提交。
 3. 新增 staged diff 过滤、secret 行脱敏、超长 diff 截断和相关单元测试，并更新 README、DEVOPS 与计划状态。
+
+2026-07-17 21:10:34
+
+1. 新增 `git muse init`，用于在用户目录创建示例 `.git-muse.json` 配置文件。
+2. 配置读取增加 `~/.git-muse.json` 支持，可从 JSON 读取 provider、baseUrl、model 和 apiKey。
+3. OpenAI-compatible provider 支持 `baseUrl` 直接填写完整 `/chat/completions` 地址，避免重复拼接路径。
+
+2026-07-17 21:15:33
+
+1. 新增 `maxTokens` 和 `timeoutSeconds` 配置项，用于控制大 diff 场景下的模型输出长度和 HTTP 等待时间。
+2. OpenAI-compatible 请求写入 `max_tokens`，Ollama 请求写入 `num_predict`。
+3. `git muse doctor` 增加 maxDiffBytes、maxTokens 和 timeoutSeconds 输出，便于确认实际参数。
+
+2026-07-17 21:19:02
+
+1. 将 `.git-muse.json` 示例改为树形结构，按 `llm`、`output` 和 `diff` 分类配置。
+2. 配置加载逻辑改为读取分类 JSON 字段，避免所有参数平铺在根节点。
+3. 更新配置测试，覆盖树形 JSON 中的 LLM、输出和 diff 参数。
+
+2026-07-17 21:25:32
+
+1. 调整 `git muse init` 行为：配置文件已存在时直接覆盖写入示例配置。
+2. 更新初始化提示文案，从创建改为写入，避免覆盖场景描述不准确。
+3. 更新配置初始化测试，覆盖重复执行 `InitFile` 的覆盖行为。

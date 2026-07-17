@@ -16,6 +16,8 @@ type Compatible struct {
 	Model       string
 	APIKey      string
 	Temperature float64
+	MaxTokens   int
+	TimeoutSec  int
 }
 
 func (p Compatible) Name() string { return "compatible" }
@@ -25,6 +27,7 @@ func (p Compatible) Generate(ctx context.Context, req GenerateRequest) (Generate
 	payload := map[string]any{
 		"model":       p.Model,
 		"temperature": p.Temperature,
+		"max_tokens":  p.MaxTokens,
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
@@ -35,7 +38,10 @@ func (p Compatible) Generate(ctx context.Context, req GenerateRequest) (Generate
 		return GenerateResponse{}, err
 	}
 
-	url := strings.TrimRight(p.BaseURL, "/") + "/chat/completions"
+	url := strings.TrimRight(p.BaseURL, "/")
+	if !strings.HasSuffix(url, "/chat/completions") {
+		url += "/chat/completions"
+	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return GenerateResponse{}, err
@@ -43,7 +49,7 @@ func (p Compatible) Generate(ctx context.Context, req GenerateRequest) (Generate
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+p.APIKey)
 
-	client := http.Client{Timeout: 60 * time.Second}
+	client := http.Client{Timeout: time.Duration(p.TimeoutSec) * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return GenerateResponse{}, err

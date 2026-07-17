@@ -15,6 +15,7 @@ Usage:
   git-muse [command]
 
 Commands:
+  init       Write example config to ~/.git-muse.json
   generate   Generate commit message from staged changes
   inspect    Show context that would be sent to LLM
   doctor     Check repository and configuration
@@ -34,6 +35,8 @@ func run(ctx context.Context, args []string) error {
 	}
 
 	switch args[0] {
+	case "init":
+		return app.RunInit()
 	case "generate":
 		return app.RunGenerate(ctx)
 	case "inspect":

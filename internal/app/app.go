@@ -93,6 +93,9 @@ func RunInspect(ctx context.Context) error {
 		return err
 	}
 	cfg := config.Load(ctx, client)
+	if cfg.FileError != nil {
+		return cfg.FileError
+	}
 
 	data, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
 	if err != nil {
@@ -120,12 +123,25 @@ func RunInspect(ctx context.Context) error {
 	return nil
 }
 
+func RunInit() error {
+	path, err := config.InitFile()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Wrote %s\n", path)
+	fmt.Println("Edit apiKey before running git muse.")
+	return nil
+}
+
 func RunDoctor(ctx context.Context) error {
 	client := git.New("")
 	if err := client.RequireRepo(ctx); err != nil {
 		return err
 	}
 	cfg := config.Load(ctx, client)
+	if cfg.FileError != nil {
+		return cfg.FileError
+	}
 
 	data, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
 	if err != nil {
@@ -136,10 +152,20 @@ func RunDoctor(ctx context.Context) error {
 	fmt.Printf("Staged changes      OK, %d diff bytes\n", len(data.Diff))
 	fmt.Printf("Provider            %s\n", statusValue(cfg.Provider))
 	fmt.Printf("Model               %s\n", statusValue(cfg.Model))
+	fmt.Printf("Max diff bytes      %d\n", cfg.MaxDiffBytes)
+	fmt.Printf("Max tokens          %d\n", cfg.MaxTokens)
+	fmt.Printf("Timeout seconds     %d\n", cfg.TimeoutSec)
+	if path, err := config.Path(); err == nil {
+		fmt.Printf("Config file         %s\n", path)
+	}
 	if cfg.Provider == "ollama" {
 		fmt.Println("API key             not required")
 	} else if cfg.APIKeyName != "" && cfg.APIKey != "" {
-		fmt.Printf("API key             OK, %s\n", cfg.APIKeyName)
+		if os.Getenv(cfg.APIKeyName) != "" {
+			fmt.Printf("API key             OK, %s\n", cfg.APIKeyName)
+		} else {
+			fmt.Println("API key             OK, config file")
+		}
 	} else if cfg.APIKeyName != "" {
 		fmt.Printf("API key             missing, %s\n", cfg.APIKeyName)
 	} else {
