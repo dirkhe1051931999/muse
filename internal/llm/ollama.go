@@ -15,6 +15,8 @@ type Ollama struct {
 	BaseURL     string
 	Model       string
 	Temperature float64
+	MaxTokens   int
+	TimeoutSec  int
 }
 
 func (p Ollama) Name() string { return "ollama" }
@@ -28,7 +30,7 @@ func (p Ollama) Generate(ctx context.Context, req GenerateRequest) (GenerateResp
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
 		},
-		"options": map[string]any{"temperature": p.Temperature},
+		"options": map[string]any{"temperature": p.Temperature, "num_predict": p.MaxTokens},
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -42,7 +44,7 @@ func (p Ollama) Generate(ctx context.Context, req GenerateRequest) (GenerateResp
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := http.Client{Timeout: 120 * time.Second}
+	client := http.Client{Timeout: time.Duration(p.TimeoutSec) * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return GenerateResponse{}, err

@@ -28,9 +28,9 @@ type GenerateResponse struct {
 func New(cfg config.Config) (Provider, error) {
 	switch cfg.Provider {
 	case "ollama":
-		return Ollama{BaseURL: cfg.BaseURL, Model: cfg.Model, Temperature: cfg.Temperature}, nil
+		return Ollama{BaseURL: cfg.BaseURL, Model: cfg.Model, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec}, nil
 	case "compatible", "openai", "openrouter":
-		return Compatible{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Temperature: cfg.Temperature}, nil
+		return Compatible{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider %q", cfg.Provider)
 	}
