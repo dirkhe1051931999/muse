@@ -81,3 +81,8 @@
 2026-07-17 21:43:56
 
 1. 新增 PATH 前置逻辑测试，覆盖移动后的 `git-muse.exe` 目录优先级。
+
+2026-07-17 21:48:26
+
+1. 修复 `git muse init` 写入用户 PATH 时路径包含空格导致 PowerShell 参数解析失败的问题。
+2. 用户 PATH 写入改为通过 `reg add HKCU\Environment` 完成，避免命令参数被空格拆分。

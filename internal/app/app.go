@@ -287,7 +287,7 @@ func userPath(ctx context.Context) (string, error) {
 }
 
 func setUserPath(ctx context.Context, value string) error {
-	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", "[Environment]::SetEnvironmentVariable('Path', $args[0], 'User')", value)
+	cmd := exec.CommandContext(ctx, "reg", "add", `HKCU\Environment`, "/v", "Path", "/t", "REG_EXPAND_SZ", "/d", value, "/f")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
