@@ -17,6 +17,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Check release trigger
+    runs-on: ubuntu-latest
+    outputs:
+      build_run: ${{ steps.changed.outputs.build_run }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check .build_run change
+        id: changed
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "build_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            changed_files="$(git diff-tree --no-commit-id --name-only -r "$after")"
+          else
+            changed_files="$(git diff --name-only "$before" "$after")"
+          fi
+
+          if echo "$changed_files" | grep -Fxq ".build_run"; then
+            echo "build_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   ci:
     name: CI
     runs-on: ubuntu-latest
@@ -45,8 +81,10 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/ambisonic'
+    needs:
+      - ci
+      - changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/ambisonic' && needs.changes.outputs.build_run == 'true'
 
     env:
       CGO_ENABLED: '0'

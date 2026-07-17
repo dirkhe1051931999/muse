@@ -82,13 +82,13 @@ Diff filtering plan
 - Later: summarize lockfiles instead of sending full lockfile diffs.
 
 Milestones
-- M1: compileable CLI skeleton with `generate`, `inspect`, `doctor`.
-- M2: config reader and effective config output.
-- M3: OpenAI-compatible provider, strict JSON parsing, one retry on invalid JSON.
-- M4: Ollama provider.
-- M5: interactive confirm/edit/regenerate and `git commit -F`.
-- M6: filtering, redaction, truncation, and inspect details.
-- M7: release binaries and install docs.
+- M1: compileable CLI skeleton with `generate`, `inspect`, `doctor`. Done.
+- M2: config reader and effective config output. Done for Git config and env reads; `config list` remains future work.
+- M3: OpenAI-compatible provider, strict JSON parsing, one retry on invalid JSON. Done.
+- M4: Ollama provider. Done.
+- M5: interactive confirm/edit/regenerate and `git commit -F`. Done.
+- M6: filtering, redaction, truncation, and inspect details. Done for MVP patterns.
+- M7: release binaries and install docs. Done.
 
 Checks
 - `go test ./...`
