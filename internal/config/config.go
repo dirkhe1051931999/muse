@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,10 +17,13 @@ type Config struct {
 	Provider     string
 	Model        string
 	BaseURL      string
+	Proxy        string
 	Format       string
 	Language     string
 	Count        int
 	MaxDiffBytes int
+	IgnoreGlobs  []string
+	AllowGlobs   []string
 	MaxTokens    int
 	TimeoutSec   int
 	Temperature  float64
@@ -34,6 +38,7 @@ type fileConfig struct {
 		BaseURL     string  `json:"baseUrl"`
 		Model       string  `json:"model"`
 		APIKey      string  `json:"apiKey"`
+		Proxy       string  `json:"proxy"`
 		Temperature float64 `json:"temperature"`
 		MaxTokens   int     `json:"maxTokens"`
 		TimeoutSec  int     `json:"timeoutSeconds"`
@@ -44,7 +49,9 @@ type fileConfig struct {
 		Count    int    `json:"count"`
 	} `json:"output"`
 	Diff struct {
-		MaxBytes int `json:"maxBytes"`
+		MaxBytes int      `json:"maxBytes"`
+		Ignore   []string `json:"ignore"`
+		Allow    []string `json:"allow"`
 	} `json:"diff"`
 }
 
@@ -54,8 +61,9 @@ const Example = `{
     "baseUrl": "https://token.sensenova.cn/v1/chat/completions",
     "model": "deepseek-v4-flash",
     "apiKey": "sk-keykeykey...keykeykey",
+    "proxy": "",
     "temperature": 0.2,
-    "maxTokens": 700,
+    "maxTokens": 2048,
     "timeoutSeconds": 180
   },
   "output": {
@@ -64,28 +72,33 @@ const Example = `{
     "count": 1
   },
   "diff": {
-    "maxBytes": 100000
+    "maxBytes": 100000,
+    "ignore": [],
+    "allow": []
   }
 }
 `
 
-func Load(ctx context.Context, client git.Client) Config {
+func Load(ctx context.Context, client git.Client) (Config, error) {
 	cfg := Config{
 		Format:       "conventional",
 		Language:     "en",
 		Count:        1,
 		MaxDiffBytes: 100000,
-		MaxTokens:    700,
+		MaxTokens:    2048,
 		TimeoutSec:   180,
 		Temperature:  0.2,
 	}
 	cfg.Provider = gitValue(ctx, client, "muse.provider", cfg.Provider)
 	cfg.Model = gitValue(ctx, client, "muse.model", cfg.Model)
 	cfg.BaseURL = gitValue(ctx, client, "muse.baseUrl", cfg.BaseURL)
+	cfg.Proxy = gitValue(ctx, client, "muse.proxy", cfg.Proxy)
 	cfg.Format = gitValue(ctx, client, "muse.format", cfg.Format)
 	cfg.Language = gitValue(ctx, client, "muse.language", cfg.Language)
 	cfg.Count = intGitValue(ctx, client, "muse.count", cfg.Count)
 	cfg.MaxDiffBytes = intGitValue(ctx, client, "muse.maxDiffBytes", cfg.MaxDiffBytes)
+	cfg.IgnoreGlobs = csvGitValue(ctx, client, "muse.diffIgnore", cfg.IgnoreGlobs)
+	cfg.AllowGlobs = csvGitValue(ctx, client, "muse.diffAllow", cfg.AllowGlobs)
 	cfg.MaxTokens = intGitValue(ctx, client, "muse.maxTokens", cfg.MaxTokens)
 	cfg.TimeoutSec = intGitValue(ctx, client, "muse.timeoutSeconds", cfg.TimeoutSec)
 	cfg.Temperature = floatGitValue(ctx, client, "muse.temperature", cfg.Temperature)
@@ -97,13 +110,28 @@ func Load(ctx context.Context, client git.Client) Config {
 	cfg.Provider = envValue("GIT_MUSE_PROVIDER", cfg.Provider)
 	cfg.Model = envValue("GIT_MUSE_MODEL", cfg.Model)
 	cfg.BaseURL = envValue("GIT_MUSE_BASE_URL", cfg.BaseURL)
+	cfg.Proxy = envValue("GIT_MUSE_PROXY", cfg.Proxy)
 	cfg.Format = envValue("GIT_MUSE_FORMAT", cfg.Format)
 	cfg.Language = envValue("GIT_MUSE_LANGUAGE", cfg.Language)
 	cfg.Count = intEnvValue("GIT_MUSE_COUNT", cfg.Count)
 	cfg.MaxDiffBytes = intEnvValue("GIT_MUSE_MAX_DIFF_BYTES", cfg.MaxDiffBytes)
+	cfg.IgnoreGlobs = csvEnvValue("GIT_MUSE_DIFF_IGNORE", cfg.IgnoreGlobs)
+	cfg.AllowGlobs = csvEnvValue("GIT_MUSE_DIFF_ALLOW", cfg.AllowGlobs)
 	cfg.MaxTokens = intEnvValue("GIT_MUSE_MAX_TOKENS", cfg.MaxTokens)
 	cfg.TimeoutSec = intEnvValue("GIT_MUSE_TIMEOUT_SECONDS", cfg.TimeoutSec)
 	cfg.Temperature = floatEnvValue("GIT_MUSE_TEMPERATURE", cfg.Temperature)
+
+	lang, err := normalizeLanguage(cfg.Language)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Language = lang
+
+	proxy, err := NormalizeProxy(cfg.Proxy)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Proxy = proxy
 
 	switch cfg.Provider {
 	case "compatible", "openai", "openrouter":
@@ -122,7 +150,7 @@ func Load(ctx context.Context, client git.Client) Config {
 			cfg.BaseURL = "http://localhost:11434"
 		}
 	}
-	return cfg
+	return cfg, nil
 }
 
 func Path() (string, error) {
@@ -181,6 +209,9 @@ func applyFileConfig(cfg *Config, fileCfg fileConfig) {
 	if fileCfg.LLM.BaseURL != "" {
 		cfg.BaseURL = fileCfg.LLM.BaseURL
 	}
+	if fileCfg.LLM.Proxy != "" {
+		cfg.Proxy = fileCfg.LLM.Proxy
+	}
 	if fileCfg.Output.Format != "" {
 		cfg.Format = fileCfg.Output.Format
 	}
@@ -192,6 +223,12 @@ func applyFileConfig(cfg *Config, fileCfg fileConfig) {
 	}
 	if fileCfg.Diff.MaxBytes > 0 {
 		cfg.MaxDiffBytes = fileCfg.Diff.MaxBytes
+	}
+	if fileCfg.Diff.Ignore != nil {
+		cfg.IgnoreGlobs = append([]string(nil), fileCfg.Diff.Ignore...)
+	}
+	if fileCfg.Diff.Allow != nil {
+		cfg.AllowGlobs = append([]string(nil), fileCfg.Diff.Allow...)
 	}
 	if fileCfg.LLM.MaxTokens > 0 {
 		cfg.MaxTokens = fileCfg.LLM.MaxTokens
@@ -205,6 +242,40 @@ func applyFileConfig(cfg *Config, fileCfg fileConfig) {
 	if fileCfg.LLM.APIKey != "" {
 		cfg.APIKey = fileCfg.LLM.APIKey
 	}
+}
+
+func normalizeLanguage(lang string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(lang)) {
+	case "", "en":
+		return "en", nil
+	case "zh":
+		return "zh", nil
+	default:
+		return "", fmt.Errorf("unsupported language %q\n\nSupported: en, zh\n\nSet output.language in ~/.git-muse.json or:\n\n  git config muse.language en", lang)
+	}
+}
+
+// NormalizeProxy accepts host:port or a full URL. Empty input is allowed.
+// Bare host:port becomes http://host:port (covers HTTP and HTTPS targets via CONNECT).
+func NormalizeProxy(proxy string) (string, error) {
+	proxy = strings.TrimSpace(proxy)
+	if proxy == "" {
+		return "", nil
+	}
+	if !strings.Contains(proxy, "://") {
+		proxy = "http://" + proxy
+	}
+	u, err := url.Parse(proxy)
+	if err != nil {
+		return "", fmt.Errorf("invalid proxy %q: %w\n\nExample:\n\n  git muse --proxy http://127.0.0.1:7890", proxy, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("unsupported proxy scheme %q\n\nSupported: http, https\n\nExample:\n\n  git muse --proxy http://127.0.0.1:7890", u.Scheme)
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("invalid proxy %q: missing host\n\nExample:\n\n  git muse --proxy http://127.0.0.1:7890", proxy)
+	}
+	return u.String(), nil
 }
 
 func (c Config) ValidateProvider() error {
@@ -243,6 +314,35 @@ func envValue(env, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func csvGitValue(ctx context.Context, client git.Client, key string, fallback []string) []string {
+	v := gitValue(ctx, client, key, "")
+	if v == "" {
+		return fallback
+	}
+	return splitCSV(v)
+}
+
+func csvEnvValue(env string, fallback []string) []string {
+	v := envValue(env, "")
+	if v == "" {
+		return fallback
+	}
+	return splitCSV(v)
+}
+
+func splitCSV(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 func intGitValue(ctx context.Context, client git.Client, key string, fallback int) int {

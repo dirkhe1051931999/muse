@@ -98,3 +98,25 @@
 1. 修复 Windows 编辑器启动方式，改为直接执行 editor 程序并传入临时文件路径，不再通过 `cmd /C` 拼接命令。
 2. 新增 editor 参数拆分逻辑，支持带空格的引号路径和附加参数。
 3. 扩展 UI 测试，覆盖编辑器程序和参数拆分。
+
+2026-07-18 14:54:00
+
+1. 支持 output.language 仅 en/zh：prompt 按语言生成中英文 commit message，inspect/doctor 展示 Language。
+2. 生成期间 stderr 显示 Generating... 进度，完成后只输出渲染后的 message。
+3. 配置 diff.ignore / diff.allow（及 git/env 对应项），过滤优先级 allow > ignore > 内置规则。
+4. 新增全局 --help / --version，内嵌 version 包；Release 构建通过 ldflags 注入版本号。
+
+2026-07-18 15:02:00
+
+1. 超长 commit subject 改为自动截断到 72 字符，不再直接报错退出。
+2. 强化 prompt，要求中英文 subject 保持简短，细节放到 body。
+
+2026-07-18 15:05:00
+
+1. 新增全局 `--proxy`，支持 `http://127.0.0.1:7890` 或 `127.0.0.1:7890`，供 LLM 请求走代理。
+2. 配置增加 `llm.proxy` / `muse.proxy` / `GIT_MUSE_PROXY`，inspect 与 doctor 展示当前代理。
+
+2026-07-18 15:08:00
+
+1. OpenAI-compatible 请求默认关闭 thinking，避免 deepseek-v4 等模型把 max_tokens 耗在推理上导致 content 为空。
+2. 空响应错误补充 finish_reason 提示与响应片段；默认 maxTokens 调整为 2048。

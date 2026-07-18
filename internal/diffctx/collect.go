@@ -23,7 +23,7 @@ type ExcludedFile struct {
 	Reason string
 }
 
-func Collect(ctx context.Context, client git.Client, maxBytes int) (Context, error) {
+func Collect(ctx context.Context, client git.Client, opts FilterOptions) (Context, error) {
 	diff, err := client.StagedDiff(ctx)
 	if err != nil {
 		return Context{}, err
@@ -32,7 +32,7 @@ func Collect(ctx context.Context, client git.Client, maxBytes int) (Context, err
 		return Context{}, fmt.Errorf("no staged changes found\n\nStage files first:\n\n  git add <files>")
 	}
 
-	filteredDiff, excluded, truncated := Filter(diff, maxBytes)
+	filteredDiff, excluded, truncated := Filter(diff, opts)
 
 	stat, err := client.StagedStat(ctx)
 	if err != nil {

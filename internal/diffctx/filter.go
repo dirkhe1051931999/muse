@@ -8,7 +8,14 @@ import (
 
 var secretLinePattern = regexp.MustCompile(`(?i)(api[_-]?key|token|secret|password|authorization|bearer)\s*[:=]\s*[^\s]+`)
 
-func Filter(diff string, maxBytes int) (string, []ExcludedFile, bool) {
+type FilterOptions struct {
+	MaxBytes int
+	Ignore   []string
+	Allow    []string
+}
+
+func Filter(diff string, opts FilterOptions) (string, []ExcludedFile, bool) {
+	maxBytes := opts.MaxBytes
 	if maxBytes <= 0 {
 		maxBytes = 100000
 	}
@@ -21,7 +28,7 @@ func Filter(diff string, maxBytes int) (string, []ExcludedFile, bool) {
 	for _, line := range strings.Split(diff, "\n") {
 		if strings.HasPrefix(line, "diff --git ") {
 			currentPath = parseDiffPath(line)
-			reason := excludeReason(currentPath)
+			reason := excludeReason(currentPath, opts)
 			skip = reason != ""
 			if skip {
 				excluded = append(excluded, ExcludedFile{Path: currentPath, Reason: reason})
@@ -49,8 +56,14 @@ func parseDiffPath(line string) string {
 	return strings.Trim(path, "\"")
 }
 
-func excludeReason(path string) string {
+func excludeReason(path string, opts FilterOptions) string {
 	path = filepath.ToSlash(strings.TrimSpace(path))
+	if matchAny(path, opts.Allow) {
+		return ""
+	}
+	if matchAny(path, opts.Ignore) {
+		return "user ignore"
+	}
 	base := filepath.Base(path)
 	patterns := []string{".env", ".env.*", "*.pem", "*.key", "*.crt", "*.p12", "*.min.js"}
 	for _, pattern := range patterns {
@@ -64,6 +77,24 @@ func excludeReason(path string) string {
 		}
 	}
 	return ""
+}
+
+func matchAny(path string, globs []string) bool {
+	path = filepath.ToSlash(strings.TrimSpace(path))
+	base := filepath.Base(path)
+	for _, glob := range globs {
+		glob = filepath.ToSlash(strings.TrimSpace(glob))
+		if glob == "" {
+			continue
+		}
+		if ok, _ := filepath.Match(glob, path); ok {
+			return true
+		}
+		if ok, _ := filepath.Match(glob, base); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func redactLine(line string) string {

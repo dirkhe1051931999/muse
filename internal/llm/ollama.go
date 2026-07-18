@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type Ollama struct {
@@ -17,6 +16,7 @@ type Ollama struct {
 	Temperature float64
 	MaxTokens   int
 	TimeoutSec  int
+	Proxy       string
 }
 
 func (p Ollama) Name() string { return "ollama" }
@@ -44,7 +44,10 @@ func (p Ollama) Generate(ctx context.Context, req GenerateRequest) (GenerateResp
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	client := http.Client{Timeout: time.Duration(p.TimeoutSec) * time.Second}
+	client, err := newHTTPClient(p.TimeoutSec, p.Proxy)
+	if err != nil {
+		return GenerateResponse{}, err
+	}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return GenerateResponse{}, err
