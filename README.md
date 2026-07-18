@@ -28,16 +28,19 @@ git muse generate
 git muse inspect
 git muse doctor
 git muse init
-git muse --help
+git muse help
+git-muse --help
 git muse --version
 git muse --proxy http://127.0.0.1:7890
 git muse --proxy 127.0.0.1:7890
 ```
 
+说明：`git muse --help` 由 Git 自己处理，会打开 `git-muse.html`；请先运行一次 `git muse init` 安装该页面。日常也可用 `git muse help` 或 `git-muse --help`。
+
 当前可直接运行：
 
 ```bash
-go run . --help
+go run . help
 go run . --version
 go run . inspect
 go run . doctor

@@ -120,3 +120,12 @@
 
 1. OpenAI-compatible 请求默认关闭 thinking，避免 deepseek-v4 等模型把 max_tokens 耗在推理上导致 content 为空。
 2. 空响应错误补充 finish_reason 提示与响应片段；默认 maxTokens 调整为 2048。
+
+2026-07-18 15:20:00
+
+1. `git muse init` 更新用户 PATH 时，识别并替换已有 git-muse 安装目录条目，不再每个版本追加一条。
+
+2026-07-18 15:22:00
+
+1. 说明并修复 `git muse --help`：Git 会查找 git-muse.html，不进入子命令；`init` 写入 `git --html-path`/git-muse.html。
+2. 帮助文案抽到 `internal/docs`，推荐 `git muse help` / `git-muse --help` 作为不依赖手册页的用法。

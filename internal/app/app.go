@@ -13,6 +13,7 @@ import (
 	"git-muse/internal/commitmsg"
 	"git-muse/internal/config"
 	"git-muse/internal/diffctx"
+	"git-muse/internal/docs"
 	"git-muse/internal/git"
 	"git-muse/internal/llm"
 	"git-muse/internal/ui"
@@ -172,6 +173,12 @@ func RunInit(ctx context.Context) error {
 	if err := addExeDirToUserPath(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "PATH update skipped: %v\n", err)
 	}
+	if htmlPath, err := docs.InstallGitHTML(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Git help page skipped: %v\n", err)
+		fmt.Fprintln(os.Stderr, "Use: git muse help   or   git-muse --help")
+	} else {
+		fmt.Printf("Installed Git help page %s\n", htmlPath)
+	}
 	return nil
 }
 
@@ -312,15 +319,15 @@ func addExeDirToUserPath(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	next := prependPath(current, dir)
+	next := upsertGitMusePath(current, dir)
 	if next == current {
-		fmt.Printf("PATH already contains %s\n", dir)
+		fmt.Printf("PATH already points to %s\n", dir)
 		return nil
 	}
 	if err := setUserPath(ctx, next); err != nil {
 		return err
 	}
-	fmt.Printf("Added %s to user PATH\n", dir)
+	fmt.Printf("Updated user PATH git-muse entry to %s\n", dir)
 	return nil
 }
 
@@ -347,7 +354,11 @@ func setUserPath(ctx context.Context, value string) error {
 	return nil
 }
 
-func prependPath(pathValue, dir string) string {
+// upsertGitMusePath puts dir first and replaces any existing git-muse install
+// PATH entries (release folders like git-muse-v0.2.x-windows-amd64) instead of
+// appending another version.
+func upsertGitMusePath(pathValue, dir string) string {
+	dir = strings.TrimSpace(dir)
 	parts := strings.Split(pathValue, ";")
 	out := []string{dir}
 	seen := map[string]bool{strings.ToLower(filepath.Clean(dir)): true}
@@ -360,10 +371,18 @@ func prependPath(pathValue, dir string) string {
 		if seen[key] {
 			continue
 		}
+		if isGitMusePathEntry(part) {
+			continue
+		}
 		seen[key] = true
 		out = append(out, part)
 	}
 	return strings.Join(out, ";")
+}
+
+func isGitMusePathEntry(entry string) bool {
+	base := strings.ToLower(filepath.Base(filepath.Clean(strings.TrimSpace(entry))))
+	return strings.Contains(base, "git-muse")
 }
 
 func isGoRunDir(dir string) bool {
