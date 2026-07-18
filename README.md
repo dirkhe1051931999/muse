@@ -27,13 +27,18 @@ git muse
 git muse generate
 git muse inspect
 git muse doctor
-git muse help
+git muse init
+git muse --help
+git muse --version
+git muse --proxy http://127.0.0.1:7890
+git muse --proxy 127.0.0.1:7890
 ```
 
 当前可直接运行：
 
 ```bash
-go run . help
+go run . --help
+go run . --version
 go run . inspect
 go run . doctor
 ```
@@ -148,9 +153,36 @@ LOGS.md              更改记录
 
 第一版不引入 Cobra / Viper。标准库够用时不加依赖。
 
-## 配置计划
+## 配置
 
-读取这些 Git config：
+优先使用 `git muse init` 写入的 `~/.git-muse.json`。其中：
+
+- `output.language`：仅支持 `en` / `zh`（默认 `en`；改为 `zh` 生成中文 commit message）
+- `llm.proxy`：LLM HTTP 代理（同时用于访问 http/https 目标；也可用 CLI `--proxy`）
+- `diff.ignore`：额外排除路径 glob（匹配完整路径或 basename）
+- `diff.allow`：强制纳入路径（优先于 ignore 与内置 secret/vendor 规则）
+
+示例：
+
+```json
+{
+  "llm": {
+    "proxy": "http://127.0.0.1:7890"
+  },
+  "output": {
+    "language": "zh"
+  },
+  "diff": {
+    "maxBytes": 100000,
+    "ignore": ["*.lock", "coverage/*"],
+    "allow": [".env.example"]
+  }
+}
+```
+
+代理优先级：`--proxy` > `GIT_MUSE_PROXY` > `~/.git-muse.json` 的 `llm.proxy` > `muse.proxy`。
+
+也可读取这些 Git config：
 
 ```bash
 git config --global muse.provider ollama
@@ -158,6 +190,9 @@ git config --global muse.baseUrl http://localhost:11434
 git config --global muse.model qwen2.5-coder
 git config --global muse.format conventional
 git config --global muse.language en
+git config --global muse.proxy http://127.0.0.1:7890
+git config --global muse.diffIgnore "*.lock,coverage/*"
+git config --global muse.diffAllow ".env.example"
 ```
 
 API key 只从环境变量读取：

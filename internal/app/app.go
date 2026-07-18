@@ -18,17 +18,24 @@ import (
 	"git-muse/internal/ui"
 )
 
-func RunInteractive(ctx context.Context) error {
+type Options struct {
+	Proxy string
+}
+
+func RunInteractive(ctx context.Context, opts Options) error {
 	client := git.New("")
 	if err := client.RequireRepo(ctx); err != nil {
 		return err
 	}
-	cfg := config.Load(ctx, client)
+	cfg, err := loadConfig(ctx, client, opts)
+	if err != nil {
+		return err
+	}
 	if err := cfg.ValidateProvider(); err != nil {
 		return err
 	}
 
-	ctxData, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
+	ctxData, err := diffctx.Collect(ctx, client, filterOptions(cfg))
 	if err != nil {
 		return err
 	}
@@ -71,17 +78,20 @@ func RunInteractive(ctx context.Context) error {
 	return nil
 }
 
-func RunGenerate(ctx context.Context) error {
+func RunGenerate(ctx context.Context, opts Options) error {
 	client := git.New("")
 	if err := client.RequireRepo(ctx); err != nil {
 		return err
 	}
-	cfg := config.Load(ctx, client)
+	cfg, err := loadConfig(ctx, client, opts)
+	if err != nil {
+		return err
+	}
 	if err := cfg.ValidateProvider(); err != nil {
 		return err
 	}
 
-	data, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
+	data, err := diffctx.Collect(ctx, client, filterOptions(cfg))
 	if err != nil {
 		return err
 	}
@@ -97,17 +107,20 @@ func RunGenerate(ctx context.Context) error {
 	return nil
 }
 
-func RunInspect(ctx context.Context) error {
+func RunInspect(ctx context.Context, opts Options) error {
 	client := git.New("")
 	if err := client.RequireRepo(ctx); err != nil {
 		return err
 	}
-	cfg := config.Load(ctx, client)
+	cfg, err := loadConfig(ctx, client, opts)
+	if err != nil {
+		return err
+	}
 	if cfg.FileError != nil {
 		return cfg.FileError
 	}
 
-	data, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
+	data, err := diffctx.Collect(ctx, client, filterOptions(cfg))
 	if err != nil {
 		return err
 	}
@@ -115,6 +128,8 @@ func RunInspect(ctx context.Context) error {
 	fmt.Printf("Provider: %s\n", valueOrUnset(cfg.Provider))
 	fmt.Printf("Model: %s\n", valueOrUnset(cfg.Model))
 	fmt.Printf("Base URL: %s\n", valueOrUnset(cfg.BaseURL))
+	fmt.Printf("Proxy: %s\n", valueOrUnset(cfg.Proxy))
+	fmt.Printf("Language: %s\n", cfg.Language)
 	fmt.Printf("Branch: %s\n", data.Branch)
 	fmt.Printf("Status bytes: %d\n", len(data.Status))
 	fmt.Printf("Stat bytes: %d\n", len(data.Stat))
@@ -160,17 +175,20 @@ func RunInit(ctx context.Context) error {
 	return nil
 }
 
-func RunDoctor(ctx context.Context) error {
+func RunDoctor(ctx context.Context, opts Options) error {
 	client := git.New("")
 	if err := client.RequireRepo(ctx); err != nil {
 		return err
 	}
-	cfg := config.Load(ctx, client)
+	cfg, err := loadConfig(ctx, client, opts)
+	if err != nil {
+		return err
+	}
 	if cfg.FileError != nil {
 		return cfg.FileError
 	}
 
-	data, err := diffctx.Collect(ctx, client, cfg.MaxDiffBytes)
+	data, err := diffctx.Collect(ctx, client, filterOptions(cfg))
 	if err != nil {
 		return err
 	}
@@ -179,6 +197,8 @@ func RunDoctor(ctx context.Context) error {
 	fmt.Printf("Staged changes      OK, %d diff bytes\n", len(data.Diff))
 	fmt.Printf("Provider            %s\n", statusValue(cfg.Provider))
 	fmt.Printf("Model               %s\n", statusValue(cfg.Model))
+	fmt.Printf("Language            %s\n", cfg.Language)
+	fmt.Printf("Proxy               %s\n", statusValue(cfg.Proxy))
 	fmt.Printf("Max diff bytes      %d\n", cfg.MaxDiffBytes)
 	fmt.Printf("Max tokens          %d\n", cfg.MaxTokens)
 	fmt.Printf("Timeout seconds     %d\n", cfg.TimeoutSec)
@@ -202,6 +222,9 @@ func RunDoctor(ctx context.Context) error {
 }
 
 func generateMessage(ctx context.Context, provider llm.Provider, cfg config.Config, data diffctx.Context) (string, error) {
+	stop := ui.StartGenerating(os.Stderr)
+	defer stop()
+
 	response, err := provider.Generate(ctx, llm.GenerateRequest{Config: cfg, Diff: data})
 	if err != nil {
 		response, err = provider.Generate(ctx, llm.GenerateRequest{Config: cfg, Diff: data})
@@ -210,6 +233,30 @@ func generateMessage(ctx context.Context, provider llm.Provider, cfg config.Conf
 		}
 	}
 	return commitmsg.Render(response.Candidates[0]), nil
+}
+
+func filterOptions(cfg config.Config) diffctx.FilterOptions {
+	return diffctx.FilterOptions{
+		MaxBytes: cfg.MaxDiffBytes,
+		Ignore:   cfg.IgnoreGlobs,
+		Allow:    cfg.AllowGlobs,
+	}
+}
+
+func loadConfig(ctx context.Context, client git.Client, opts Options) (config.Config, error) {
+	cfg, err := config.Load(ctx, client)
+	if err != nil {
+		return cfg, err
+	}
+	if opts.Proxy == "" {
+		return cfg, nil
+	}
+	proxy, err := config.NormalizeProxy(opts.Proxy)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Proxy = proxy
+	return cfg, nil
 }
 
 func commitWithMessage(ctx context.Context, client git.Client, message string) error {

@@ -28,9 +28,9 @@ type GenerateResponse struct {
 func New(cfg config.Config) (Provider, error) {
 	switch cfg.Provider {
 	case "ollama":
-		return Ollama{BaseURL: cfg.BaseURL, Model: cfg.Model, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec}, nil
+		return Ollama{BaseURL: cfg.BaseURL, Model: cfg.Model, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec, Proxy: cfg.Proxy}, nil
 	case "compatible", "openai", "openrouter":
-		return Compatible{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec}, nil
+		return Compatible{BaseURL: cfg.BaseURL, Model: cfg.Model, APIKey: cfg.APIKey, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec, Proxy: cfg.Proxy}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider %q", cfg.Provider)
 	}
@@ -54,14 +54,16 @@ func validateResponse(response GenerateResponse) error {
 	if len(response.Candidates) == 0 {
 		return fmt.Errorf("model returned no candidates")
 	}
-	for _, candidate := range response.Candidates {
+	for i, candidate := range response.Candidates {
+		candidate = commitmsg.Normalize(candidate)
 		if err := commitmsg.Validate(candidate); err != nil {
 			return err
 		}
+		response.Candidates[i] = candidate
 	}
 	return nil
 }
 
 func messages(req GenerateRequest) (string, string) {
-	return prompt.System(), prompt.User(req.Config, req.Diff)
+	return prompt.System(req.Config), prompt.User(req.Config, req.Diff)
 }

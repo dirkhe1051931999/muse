@@ -173,7 +173,7 @@ jobs:
 
             $env:GOOS = $target.GOOS
             $env:GOARCH = $target.GOARCH
-            go build -trimpath -ldflags "-s -w" -o (Join-Path $stage $target.Bin) .
+            go build -trimpath -ldflags "-s -w -X git-muse/internal/version.Version=$tag" -o (Join-Path $stage $target.Bin) .
             if ($LASTEXITCODE -ne 0) {
               throw "go build failed for $($target.GOOS)/$($target.GOARCH)"
             }
