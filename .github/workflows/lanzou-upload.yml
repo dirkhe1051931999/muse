@@ -87,22 +87,8 @@ jobs:
           fi
           du -h "$ARCHIVE"
 
-          RESPONSE_BODY="$(mktemp)"
-          HTTP_STATUS="$(curl --show-error --silent \
-            --output "$RESPONSE_BODY" \
-            --write-out "%{http_code}" \
+          curl --fail-with-body --show-error --silent \
             -X POST "${LANZOU_BASE_URL}/api/v1/client/lanzou/upload" \
             -H "x-oolaf-client-key: ${LANZOU_CLIENT_KEY}" \
             -F "folderId=${LANZOU_FOLDER_ID}" \
-            -F "file=@${ARCHIVE}")"
-
-          cat "$RESPONSE_BODY"
-          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            exit 0
-          fi
-          if [ "$HTTP_STATUS" = "504" ]; then
-            echo "Lanzou upload request timed out after upstream accepted the file; treating 504 as non-fatal."
-            exit 0
-          fi
-          echo "Upload failed with HTTP ${HTTP_STATUS}"
-          exit 1
+            -F "file=@${ARCHIVE}"
