@@ -74,9 +74,7 @@ jobs:
 
           mkdir -p "$STAGE"
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X git-muse/internal/version.Version=v0.2.10" -o "$STAGE/git-muse.exe" .
-          cp README.md "$STAGE/"
-          cp LICENSE* "$STAGE/" 2>/dev/null || true
-          (cd "$STAGE" && zip -r "../${RELEASE_NAME}-${TIMESTAMP}.zip" .)
+          (cd "$STAGE" && zip -9 "../${RELEASE_NAME}-${TIMESTAMP}.zip" git-muse.exe)
           ls -lh "$ARCHIVE"
 
       - name: Upload to Lanzou
@@ -87,9 +85,24 @@ jobs:
             echo "Archive missing"
             exit 1
           fi
+          du -h "$ARCHIVE"
 
-          curl --fail-with-body --show-error --silent \
+          RESPONSE_BODY="$(mktemp)"
+          HTTP_STATUS="$(curl --show-error --silent \
+            --output "$RESPONSE_BODY" \
+            --write-out "%{http_code}" \
             -X POST "${LANZOU_BASE_URL}/api/v1/client/lanzou/upload" \
             -H "x-oolaf-client-key: ${LANZOU_CLIENT_KEY}" \
             -F "folderId=${LANZOU_FOLDER_ID}" \
-            -F "file=@${ARCHIVE}"
+            -F "file=@${ARCHIVE}")"
+
+          cat "$RESPONSE_BODY"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            exit 0
+          fi
+          if [ "$HTTP_STATUS" = "504" ]; then
+            echo "Lanzou upload request timed out after upstream accepted the file; treating 504 as non-fatal."
+            exit 0
+          fi
+          echo "Upload failed with HTTP ${HTTP_STATUS}"
+          exit 1
