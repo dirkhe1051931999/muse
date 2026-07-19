@@ -129,3 +129,18 @@
 
 1. 说明并修复 `git muse --help`：Git 会查找 git-muse.html，不进入子命令；`init` 写入 `git --html-path`/git-muse.html。
 2. 帮助文案抽到 `internal/docs`，推荐 `git muse help` / `git-muse --help` 作为不依赖手册页的用法。
+
+2026-07-19 18:14:41
+
+1. 新增蓝奏上传 GitHub Actions 工作流，参考 `json-prettier` 的接口、client key 和上传流程。
+2. 工作流在 `ambisonic` 分支 push 时构建 `git-muse.exe` 并打包上传，`LANZOU_FOLDER_ID` 暂用占位值。
+
+2026-07-19 18:17:30
+
+1. 调整蓝奏上传工作流，先检查 push 中 `.build_run` 是否变化。
+2. 仅当 `.build_run` 发生变化时执行构建打包和蓝奏上传任务。
+
+2026-07-19 18:19:19
+
+1. 调整蓝奏上传包名为 `git-muse-v0.2.10-windows-amd64-[10位时间戳].zip`，避免多次 CI 上传冲突。
+2. 蓝奏上传工作流仅构建并上传 Windows amd64 包，包内包含 `git-muse.exe`、README 和可选 LICENSE。
