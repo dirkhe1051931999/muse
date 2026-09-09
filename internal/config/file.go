@@ -43,7 +43,10 @@ func (l *LLMFileList) UnmarshalJSON(data []byte) error {
 }
 
 type fileConfig struct {
-	LLM    LLMFileList `json:"llm"`
+	LLM      LLMFileList `json:"llm"`
+	Failover struct {
+		RateLimitRetries int `json:"rateLimitRetries"`
+	} `json:"failover"`
 	Output struct {
 		Format   string `json:"format"`
 		Language string `json:"language"`
@@ -75,6 +78,9 @@ const Example = `{
       "apiKey": "sk-another-key"
     }
   ],
+  "failover": {
+    "rateLimitRetries": 3
+  },
   "output": {
     "format": "conventional",
     "language": "en",
@@ -127,6 +133,9 @@ func InitFile(overwrite bool) (string, error) {
 }
 
 func applyFileConfig(cfg *Config, fileCfg fileConfig) {
+	if fileCfg.Failover.RateLimitRetries > 0 {
+		cfg.RateLimitRetries = fileCfg.Failover.RateLimitRetries
+	}
 	if len(fileCfg.LLM) > 0 {
 		applyLLMFile(cfg, fileCfg.LLM[0], true)
 	}

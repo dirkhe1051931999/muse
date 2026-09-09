@@ -182,3 +182,8 @@
 
 1. `git muse help` 文末和 `git muse --version` 打印版本号以及正在运行的 `git-muse.exe` 路径。
 2. `git muse doctor` 同步输出 Version / Executable，便于核对 PATH 命中的二进制。
+
+2026-09-09 17:28:00
+
+1. 限流不再第一次就切模型：每个 LLM 先重试 `failover.rateLimitRetries` 次（默认 3），超过后才请求下一个。
+2. 重试与切换都会在 stderr 打日志；`inspect` / `doctor` / init 示例与 README 补充该配置。

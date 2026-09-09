@@ -13,23 +13,24 @@ import (
 )
 
 type Config struct {
-	Provider     string
-	Model        string
-	BaseURL      string
-	Proxy        string
-	Format       string
-	Language     string
-	Count        int
-	MaxDiffBytes int
-	IgnoreGlobs  []string
-	AllowGlobs   []string
-	MaxTokens    int
-	TimeoutSec   int
-	Temperature  float64
-	APIKey       string
-	APIKeyName   string
-	Fallbacks    []Config
-	FileError    error
+	Provider         string
+	Model            string
+	BaseURL          string
+	Proxy            string
+	Format           string
+	Language         string
+	Count            int
+	MaxDiffBytes     int
+	IgnoreGlobs      []string
+	AllowGlobs       []string
+	MaxTokens        int
+	TimeoutSec       int
+	Temperature      float64
+	APIKey           string
+	APIKeyName       string
+	Fallbacks        []Config
+	RateLimitRetries int
+	FileError        error
 }
 
 func (c Config) LLMLabel() string {
@@ -55,13 +56,14 @@ func (c Config) Chain() []Config {
 
 func Load(ctx context.Context, client git.Client) (Config, error) {
 	cfg := Config{
-		Format:       "conventional",
-		Language:     "en",
-		Count:        1,
-		MaxDiffBytes: 100000,
-		MaxTokens:    2048,
-		TimeoutSec:   180,
-		Temperature:  0.2,
+		Format:           "conventional",
+		Language:         "en",
+		Count:            1,
+		MaxDiffBytes:     100000,
+		MaxTokens:        2048,
+		TimeoutSec:       180,
+		Temperature:      0.2,
+		RateLimitRetries: 3,
 	}
 	cfg.Provider = gitValue(ctx, client, "muse.provider", cfg.Provider)
 	cfg.Model = gitValue(ctx, client, "muse.model", cfg.Model)
@@ -99,6 +101,7 @@ func Load(ctx context.Context, client git.Client) (Config, error) {
 	cfg.MaxTokens = intEnvValue("GIT_MUSE_MAX_TOKENS", cfg.MaxTokens)
 	cfg.TimeoutSec = intEnvValue("GIT_MUSE_TIMEOUT_SECONDS", cfg.TimeoutSec)
 	cfg.Temperature = floatEnvValue("GIT_MUSE_TEMPERATURE", cfg.Temperature)
+	cfg.RateLimitRetries = NormalizeRateLimitRetries(cfg.RateLimitRetries)
 
 	lang, err := normalizeLanguage(cfg.Language)
 	if err != nil {
@@ -191,6 +194,13 @@ func NormalizeProxy(proxy string) (string, error) {
 		return "", fmt.Errorf("invalid proxy %q: missing host\n\nExample:\n\n  git muse --proxy http://127.0.0.1:7890", proxy)
 	}
 	return u.String(), nil
+}
+
+func NormalizeRateLimitRetries(n int) int {
+	if n <= 0 {
+		return 3
+	}
+	return n
 }
 
 func (c Config) ValidateProvider() error {

@@ -234,6 +234,9 @@ func generateMessage(ctx context.Context, provider llm.Provider, cfg config.Conf
 
 	response, err := provider.Generate(ctx, llm.GenerateRequest{Config: cfg, Diff: data})
 	if err != nil {
+		if llm.IsRateLimited(err) {
+			return "", err
+		}
 		response, err = provider.Generate(ctx, llm.GenerateRequest{Config: cfg, Diff: data})
 		if err != nil {
 			return "", err
@@ -293,6 +296,7 @@ func printLLMEndpoints(cfg config.Config) {
 			fmt.Printf("Provider: %s\n", valueOrUnset(item.Provider))
 			fmt.Printf("Model: %s\n", valueOrUnset(item.Model))
 			fmt.Printf("Base URL: %s\n", valueOrUnset(item.BaseURL))
+			fmt.Printf("Rate limit retries: %d\n", config.NormalizeRateLimitRetries(cfg.RateLimitRetries))
 			continue
 		}
 		fmt.Printf("Fallback %d: %s  %s  %s\n", i+1, valueOrUnset(item.Provider), valueOrUnset(item.Model), valueOrUnset(item.BaseURL))
@@ -305,6 +309,7 @@ func printDoctorLLMs(cfg config.Config) {
 		if i == 0 {
 			fmt.Printf("Provider            %s\n", statusValue(item.Provider))
 			fmt.Printf("Model               %s\n", statusValue(item.Model))
+			fmt.Printf("Rate limit retries  %d\n", config.NormalizeRateLimitRetries(cfg.RateLimitRetries))
 			continue
 		}
 		fmt.Printf("Fallback %d          %s\n", i+1, item.LLMLabel())

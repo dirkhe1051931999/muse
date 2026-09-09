@@ -52,8 +52,9 @@ func TestFailoverSwitchesOnRateLimit(t *testing.T) {
 			stubProvider{name: "a", err: &RateLimitError{Status: "429 Too Many Requests", Body: "rpm"}},
 			stubProvider{name: "b", resp: ok},
 		},
-		Labels: []string{"compatible/model-a", "compatible/model-b"},
-		Log:    &log,
+		Labels:           []string{"compatible/model-a", "compatible/model-b"},
+		RateLimitRetries: 1,
+		Log:              &log,
 	}
 	got, err := p.Generate(context.Background(), GenerateRequest{})
 	if err != nil {
@@ -65,6 +66,79 @@ func TestFailoverSwitchesOnRateLimit(t *testing.T) {
 	out := log.String()
 	if !strings.Contains(out, "rate limited") || !strings.Contains(out, "compatible/model-a") || !strings.Contains(out, "compatible/model-b") {
 		t.Fatalf("missing switch log: %q", out)
+	}
+}
+
+type countStub struct {
+	name  string
+	err   error
+	resp  GenerateResponse
+	fail  int
+	calls int
+}
+
+func (s *countStub) Name() string { return s.name }
+
+func (s *countStub) Generate(context.Context, GenerateRequest) (GenerateResponse, error) {
+	s.calls++
+	if s.calls <= s.fail {
+		return GenerateResponse{}, s.err
+	}
+	return s.resp, nil
+}
+
+func TestFailoverRetriesBeforeSwitch(t *testing.T) {
+	ok := GenerateResponse{Candidates: []commitmsg.Candidate{{Type: "feat", Subject: "ok"}}}
+	first := &countStub{name: "a", fail: 2, err: &RateLimitError{Status: "429 Too Many Requests"}, resp: ok}
+	second := &countStub{name: "b", fail: 0, resp: ok}
+	var log bytes.Buffer
+	p := Failover{
+		Providers:        []Provider{first, second},
+		Labels:           []string{"compatible/model-a", "compatible/model-b"},
+		RateLimitRetries: 3,
+		Log:              &log,
+	}
+	if _, err := p.Generate(context.Background(), GenerateRequest{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if first.calls != 3 {
+		t.Fatalf("first.calls = %d, want 3", first.calls)
+	}
+	if second.calls != 0 {
+		t.Fatalf("second.calls = %d, want 0", second.calls)
+	}
+	out := log.String()
+	if !strings.Contains(out, "retry 1/3") || !strings.Contains(out, "retry 2/3") {
+		t.Fatalf("missing retry log: %q", out)
+	}
+	if strings.Contains(out, "switching") {
+		t.Fatalf("should not switch: %q", out)
+	}
+}
+
+func TestFailoverSwitchesAfterRetryBudget(t *testing.T) {
+	ok := GenerateResponse{Candidates: []commitmsg.Candidate{{Type: "feat", Subject: "ok"}}}
+	first := &countStub{name: "a", fail: 10, err: &RateLimitError{Status: "429 Too Many Requests"}}
+	second := &countStub{name: "b", fail: 0, resp: ok}
+	var log bytes.Buffer
+	p := Failover{
+		Providers:        []Provider{first, second},
+		Labels:           []string{"compatible/model-a", "compatible/model-b"},
+		RateLimitRetries: 3,
+		Log:              &log,
+	}
+	if _, err := p.Generate(context.Background(), GenerateRequest{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if first.calls != 3 {
+		t.Fatalf("first.calls = %d, want 3", first.calls)
+	}
+	if second.calls != 1 {
+		t.Fatalf("second.calls = %d, want 1", second.calls)
+	}
+	out := log.String()
+	if !strings.Contains(out, "retry 1/3") || !strings.Contains(out, "retry 2/3") || !strings.Contains(out, "switching") {
+		t.Fatalf("missing retry/switch log: %q", out)
 	}
 }
 

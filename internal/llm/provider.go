@@ -26,7 +26,7 @@ type GenerateResponse struct {
 }
 
 func New(cfg config.Config) (Provider, error) {
-	return newChain(cfg.Chain())
+	return newChain(cfg.Chain(), cfg.RateLimitRetries)
 }
 
 func newOne(cfg config.Config) (Provider, error) {

@@ -32,7 +32,7 @@ Global flags:
 Notes:
   git muse --version (or git-muse --version) prints the running git-muse.exe path.
   ~/.git-muse.json llm may be one object or an array. Rate-limited (RPM/429)
-  requests automatically switch to the next entry.
+  requests retry failover.rateLimitRetries times (default 3) before the next entry.
   git muse --help is handled by Git itself and opens git-muse.html.
   Run git muse init once to install that HTML help page into Git's doc path.
 `
