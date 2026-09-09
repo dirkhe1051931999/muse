@@ -31,11 +31,11 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 	if flags.Help {
-		fmt.Print(docs.Usage)
+		printHelp()
 		return nil
 	}
 	if flags.Version {
-		fmt.Printf("git-muse %s\n", version.Version)
+		fmt.Print(version.Identity())
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func run(ctx context.Context, args []string) error {
 	case "doctor":
 		return app.RunDoctor(ctx, opts)
 	case "help":
-		fmt.Print(docs.Usage)
+		printHelp()
 		return nil
 	default:
 		return fmt.Errorf("unknown command %q\n\n%s", flags.Rest[0], docs.Usage)
@@ -83,4 +83,10 @@ func parseGlobalFlags(args []string) (globalFlags, error) {
 		}
 	}
 	return flags, nil
+}
+
+func printHelp() {
+	fmt.Print(docs.Usage)
+	fmt.Print("\n")
+	fmt.Print(version.Identity())
 }

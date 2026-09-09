@@ -17,6 +17,7 @@ import (
 	"git-muse/internal/git"
 	"git-muse/internal/llm"
 	"git-muse/internal/ui"
+	"git-muse/internal/version"
 )
 
 type Options struct {
@@ -209,6 +210,8 @@ func RunDoctor(ctx context.Context, opts Options) error {
 	if path, err := config.Path(); err == nil {
 		fmt.Printf("Config file         %s\n", path)
 	}
+	fmt.Printf("Version             %s\n", version.Version)
+	fmt.Printf("Executable          %s\n", version.Executable())
 	if cfg.Provider == "ollama" {
 		fmt.Println("API key             not required")
 	} else if cfg.APIKeyName != "" && cfg.APIKey != "" {
@@ -347,12 +350,14 @@ func addExeDirToUserPath(ctx context.Context) error {
 	next := upsertGitMusePath(current, dir)
 	if next == current {
 		fmt.Printf("PATH already points to %s\n", dir)
-		return nil
+	} else {
+		if err := setUserPath(ctx, next); err != nil {
+			return err
+		}
+		fmt.Printf("Updated user PATH git-muse entry to %s\n", dir)
 	}
-	if err := setUserPath(ctx, next); err != nil {
-		return err
-	}
-	fmt.Printf("Updated user PATH git-muse entry to %s\n", dir)
+	notifyUserEnvironment()
+	fmt.Println("Already-open apps keep the old PATH. Fully quit Zed/VS Code (not just the terminal) and reopen.")
 	return nil
 }
 

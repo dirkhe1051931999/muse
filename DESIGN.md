@@ -86,6 +86,8 @@ Staged changes      OK, 5 files
 Provider            ollama
 Model               qwen2.5-coder
 API key             not required
+Version             v0.3.7
+Executable          D:\git-muse\git-muse-v0.3.7-windows-amd64\git-muse.exe
 Network             OK
 ```
 

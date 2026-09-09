@@ -172,3 +172,13 @@
 1. `~/.git-muse.json` 的 `llm` 支持单个对象或数组，可配置多个 LLM。
 2. 上游 429 / RPM / rate limit 时按数组顺序自动切换，并在 stderr 打印切换日志。
 3. `inspect` / `doctor` / `git muse init` 示例与 README 同步多 LLM 配置说明。
+
+2026-09-09 17:12:00
+
+1. `git muse init` 写入用户 PATH 后广播 `WM_SETTINGCHANGE`，让资源管理器刷新环境变量。
+2. 即使 PATH 未变化也会广播，并提示 Zed / VS Code 需要整个退出再开才能认新目录。
+
+2026-09-09 17:15:00
+
+1. `git muse help` 文末和 `git muse --version` 打印版本号以及正在运行的 `git-muse.exe` 路径。
+2. `git muse doctor` 同步输出 Version / Executable，便于核对 PATH 命中的二进制。
