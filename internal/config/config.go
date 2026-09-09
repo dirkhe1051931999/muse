@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,55 +28,30 @@ type Config struct {
 	Temperature  float64
 	APIKey       string
 	APIKeyName   string
+	Fallbacks    []Config
 	FileError    error
 }
 
-type fileConfig struct {
-	LLM struct {
-		Provider    string  `json:"provider"`
-		BaseURL     string  `json:"baseUrl"`
-		Model       string  `json:"model"`
-		APIKey      string  `json:"apiKey"`
-		Proxy       string  `json:"proxy"`
-		Temperature float64 `json:"temperature"`
-		MaxTokens   int     `json:"maxTokens"`
-		TimeoutSec  int     `json:"timeoutSeconds"`
-	} `json:"llm"`
-	Output struct {
-		Format   string `json:"format"`
-		Language string `json:"language"`
-		Count    int    `json:"count"`
-	} `json:"output"`
-	Diff struct {
-		MaxBytes int      `json:"maxBytes"`
-		Ignore   []string `json:"ignore"`
-		Allow    []string `json:"allow"`
-	} `json:"diff"`
+func (c Config) LLMLabel() string {
+	provider := strings.TrimSpace(c.Provider)
+	if provider == "" {
+		provider = "unknown"
+	}
+	model := strings.TrimSpace(c.Model)
+	if model == "" {
+		model = "unspecified"
+	}
+	return provider + "/" + model
 }
 
-const Example = `{
-  "llm": {
-    "provider": "compatible",
-    "baseUrl": "https://token.sensenova.cn/v1/chat/completions",
-    "model": "deepseek-v4-flash",
-    "apiKey": "sk-keykeykey...keykeykey",
-    "proxy": "",
-    "temperature": 0.2,
-    "maxTokens": 2048,
-    "timeoutSeconds": 180
-  },
-  "output": {
-    "format": "conventional",
-    "language": "en",
-    "count": 1
-  },
-  "diff": {
-    "maxBytes": 100000,
-    "ignore": [],
-    "allow": []
-  }
+func (c Config) Chain() []Config {
+	primary := c
+	primary.Fallbacks = nil
+	out := make([]Config, 0, 1+len(c.Fallbacks))
+	out = append(out, primary)
+	out = append(out, c.Fallbacks...)
+	return out
 }
-`
 
 func Load(ctx context.Context, client git.Client) (Config, error) {
 	cfg := Config{
@@ -111,6 +85,11 @@ func Load(ctx context.Context, client git.Client) (Config, error) {
 	cfg.Model = envValue("GIT_MUSE_MODEL", cfg.Model)
 	cfg.BaseURL = envValue("GIT_MUSE_BASE_URL", cfg.BaseURL)
 	cfg.Proxy = envValue("GIT_MUSE_PROXY", cfg.Proxy)
+	if env := strings.TrimSpace(os.Getenv("GIT_MUSE_PROXY")); env != "" {
+		for i := range cfg.Fallbacks {
+			cfg.Fallbacks[i].Proxy = env
+		}
+	}
 	cfg.Format = envValue("GIT_MUSE_FORMAT", cfg.Format)
 	cfg.Language = envValue("GIT_MUSE_LANGUAGE", cfg.Language)
 	cfg.Count = intEnvValue("GIT_MUSE_COUNT", cfg.Count)
@@ -133,11 +112,30 @@ func Load(ctx context.Context, client git.Client) (Config, error) {
 	}
 	cfg.Proxy = proxy
 
+	if err := finalizeEndpoint(&cfg, true); err != nil {
+		return cfg, err
+	}
+	for i := range cfg.Fallbacks {
+		if err := finalizeEndpoint(&cfg.Fallbacks[i], false); err != nil {
+			return cfg, err
+		}
+	}
+	return cfg, nil
+}
+
+func finalizeEndpoint(cfg *Config, envOverridesKey bool) error {
+	proxy, err := NormalizeProxy(cfg.Proxy)
+	if err != nil {
+		return err
+	}
+	cfg.Proxy = proxy
 	switch cfg.Provider {
 	case "compatible", "openai", "openrouter":
 		cfg.APIKeyName = apiKeyName(cfg.Provider)
 		if key := strings.TrimSpace(os.Getenv(cfg.APIKeyName)); key != "" {
-			cfg.APIKey = key
+			if envOverridesKey || cfg.APIKey == "" {
+				cfg.APIKey = key
+			}
 		}
 		if cfg.BaseURL == "" && cfg.Provider == "openrouter" {
 			cfg.BaseURL = "https://openrouter.ai/api/v1"
@@ -150,7 +148,7 @@ func Load(ctx context.Context, client git.Client) (Config, error) {
 			cfg.BaseURL = "http://localhost:11434"
 		}
 	}
-	return cfg, nil
+	return nil
 }
 
 func Path() (string, error) {
@@ -159,89 +157,6 @@ func Path() (string, error) {
 		return "", fmt.Errorf("find user home: %w", err)
 	}
 	return filepath.Join(home, ".git-muse.json"), nil
-}
-
-func LoadFile() (fileConfig, error) {
-	path, err := Path()
-	if err != nil {
-		return fileConfig{}, err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fileConfig{}, err
-	}
-	var cfg fileConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return fileConfig{}, fmt.Errorf("read %s: %w", path, err)
-	}
-	return cfg, nil
-}
-
-func InitFile(overwrite bool) (string, error) {
-	path, err := Path()
-	if err != nil {
-		return "", err
-	}
-	flag := os.O_WRONLY | os.O_CREATE
-	if overwrite {
-		flag |= os.O_TRUNC
-	} else {
-		flag |= os.O_EXCL
-	}
-	file, err := os.OpenFile(path, flag, 0600)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	if _, err := file.WriteString(Example); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func applyFileConfig(cfg *Config, fileCfg fileConfig) {
-	if fileCfg.LLM.Provider != "" {
-		cfg.Provider = fileCfg.LLM.Provider
-	}
-	if fileCfg.LLM.Model != "" {
-		cfg.Model = fileCfg.LLM.Model
-	}
-	if fileCfg.LLM.BaseURL != "" {
-		cfg.BaseURL = fileCfg.LLM.BaseURL
-	}
-	if fileCfg.LLM.Proxy != "" {
-		cfg.Proxy = fileCfg.LLM.Proxy
-	}
-	if fileCfg.Output.Format != "" {
-		cfg.Format = fileCfg.Output.Format
-	}
-	if fileCfg.Output.Language != "" {
-		cfg.Language = fileCfg.Output.Language
-	}
-	if fileCfg.Output.Count > 0 {
-		cfg.Count = fileCfg.Output.Count
-	}
-	if fileCfg.Diff.MaxBytes > 0 {
-		cfg.MaxDiffBytes = fileCfg.Diff.MaxBytes
-	}
-	if fileCfg.Diff.Ignore != nil {
-		cfg.IgnoreGlobs = append([]string(nil), fileCfg.Diff.Ignore...)
-	}
-	if fileCfg.Diff.Allow != nil {
-		cfg.AllowGlobs = append([]string(nil), fileCfg.Diff.Allow...)
-	}
-	if fileCfg.LLM.MaxTokens > 0 {
-		cfg.MaxTokens = fileCfg.LLM.MaxTokens
-	}
-	if fileCfg.LLM.TimeoutSec > 0 {
-		cfg.TimeoutSec = fileCfg.LLM.TimeoutSec
-	}
-	if fileCfg.LLM.Temperature != 0 {
-		cfg.Temperature = fileCfg.LLM.Temperature
-	}
-	if fileCfg.LLM.APIKey != "" {
-		cfg.APIKey = fileCfg.LLM.APIKey
-	}
 }
 
 func normalizeLanguage(lang string) (string, error) {

@@ -166,3 +166,9 @@
 2026-07-19 20:32:18
 
 1. mono 蓝奏上传改为异步后，恢复 CI 蓝奏上传步骤使用 `curl --fail-with-body`，不再特殊放过 504。
+
+2026-09-09 16:50:00
+
+1. `~/.git-muse.json` 的 `llm` 支持单个对象或数组，可配置多个 LLM。
+2. 上游 429 / RPM / rate limit 时按数组顺序自动切换，并在 stderr 打印切换日志。
+3. `inspect` / `doctor` / `git muse init` 示例与 README 同步多 LLM 配置说明。

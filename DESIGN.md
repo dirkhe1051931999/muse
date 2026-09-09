@@ -68,6 +68,8 @@ feat fix docs style refactor perf test build ci chore revert
 ```text
 Provider: ollama
 Model: qwen2.5-coder
+Base URL: http://localhost:11434
+Fallback 2: compatible  gpt-4.1-mini  https://api.openai.com/v1
 Files changed: 5
 Included bytes: 8420
 Excluded:

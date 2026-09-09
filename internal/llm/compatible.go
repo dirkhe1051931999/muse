@@ -89,6 +89,9 @@ func (p Compatible) chat(ctx context.Context, payload map[string]any) ([]byte, e
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if err := rateLimitError(resp.StatusCode, resp.Status, respBody); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("LLM request failed: %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
 	}
 	return respBody, nil

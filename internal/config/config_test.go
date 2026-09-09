@@ -41,7 +41,7 @@ func TestLoadFileReadsJSONConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-	if cfg.LLM.Provider != "compatible" || cfg.LLM.Model != "deepseek-v4-flash" || cfg.LLM.APIKey != "sk-test" {
+	if len(cfg.LLM) != 1 || cfg.LLM[0].Provider != "compatible" || cfg.LLM[0].Model != "deepseek-v4-flash" || cfg.LLM[0].APIKey != "sk-test" {
 		t.Fatalf("unexpected llm config: %+v", cfg.LLM)
 	}
 	if cfg.Output.Language != "zh" || cfg.Output.Count != 2 || cfg.Diff.MaxBytes != 200000 {
@@ -52,6 +52,37 @@ func TestLoadFileReadsJSONConfig(t *testing.T) {
 	}
 	if len(cfg.Diff.Allow) != 1 || cfg.Diff.Allow[0] != ".env.example" {
 		t.Fatalf("unexpected allow: %#v", cfg.Diff.Allow)
+	}
+}
+
+func TestLoadFileReadsLLMArray(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	path, err := Path()
+	if err != nil {
+		t.Fatalf("path: %v", err)
+	}
+	data := `{"llm":[{"provider":"compatible","baseUrl":"https://a.example/v1","model":"model-a","apiKey":"sk-a"},{"provider":"compatible","baseUrl":"https://b.example/v1","model":"model-b","apiKey":"sk-b"}]}`
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	fileCfg, err := LoadFile()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if len(fileCfg.LLM) != 2 || fileCfg.LLM[0].Model != "model-a" || fileCfg.LLM[1].Model != "model-b" {
+		t.Fatalf("unexpected llm list: %+v", fileCfg.LLM)
+	}
+	cfg := Config{Language: "en", MaxTokens: 2048, TimeoutSec: 180, Temperature: 0.2}
+	applyFileConfig(&cfg, fileCfg)
+	if cfg.Model != "model-a" || cfg.APIKey != "sk-a" {
+		t.Fatalf("primary: %+v", cfg)
+	}
+	if len(cfg.Fallbacks) != 1 || cfg.Fallbacks[0].Model != "model-b" || cfg.Fallbacks[0].APIKey != "sk-b" {
+		t.Fatalf("fallbacks: %+v", cfg.Fallbacks)
+	}
+	if cfg.Fallbacks[0].MaxTokens != 2048 || cfg.Fallbacks[0].TimeoutSec != 180 {
+		t.Fatalf("fallback inherit: %+v", cfg.Fallbacks[0])
 	}
 }
 

@@ -161,6 +161,7 @@ LOGS.md              更改记录
 优先使用 `git muse init` 写入的 `~/.git-muse.json`。其中：
 
 - `output.language`：仅支持 `en` / `zh`（默认 `en`；改为 `zh` 生成中文 commit message）
+- `llm`：单个对象或对象数组。数组按顺序尝试；上游返回 429 / RPM 限流时自动切下一个，并在 stderr 打印切换日志
 - `llm.proxy`：LLM HTTP 代理（同时用于访问 http/https 目标；也可用 CLI `--proxy`）
 - `diff.ignore`：额外排除路径 glob（匹配完整路径或 basename）
 - `diff.allow`：强制纳入路径（优先于 ignore 与内置 secret/vendor 规则）
@@ -169,9 +170,21 @@ LOGS.md              更改记录
 
 ```json
 {
-  "llm": {
-    "proxy": "http://127.0.0.1:7890"
-  },
+  "llm": [
+    {
+      "provider": "compatible",
+      "baseUrl": "https://token.sensenova.cn/v1/chat/completions",
+      "model": "deepseek-v4-flash",
+      "apiKey": "sk-primary",
+      "proxy": "http://127.0.0.1:7890"
+    },
+    {
+      "provider": "compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "gpt-4.1-mini",
+      "apiKey": "sk-fallback"
+    }
+  ],
   "output": {
     "language": "zh"
   },
@@ -182,6 +195,8 @@ LOGS.md              更改记录
   }
 }
 ```
+
+仍支持把 `llm` 写成单个对象。数组中未写的 `proxy` / `maxTokens` / `timeoutSeconds` / `temperature` 会继承第一条。限流切换只针对 RPM / 429 / `rate_limit` 一类错误，认证失败不会切到下一个。
 
 代理优先级：`--proxy` > `GIT_MUSE_PROXY` > `~/.git-muse.json` 的 `llm.proxy` > `muse.proxy`。
 

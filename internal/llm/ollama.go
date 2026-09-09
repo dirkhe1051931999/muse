@@ -56,6 +56,9 @@ func (p Ollama) Generate(ctx context.Context, req GenerateRequest) (GenerateResp
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if err := rateLimitError(resp.StatusCode, resp.Status, respBody); err != nil {
+			return GenerateResponse{}, err
+		}
 		return GenerateResponse{}, fmt.Errorf("Ollama request failed: %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
 	}
 
