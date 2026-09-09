@@ -26,10 +26,11 @@ Commands:
 
 Global flags:
   -h, --help              Show help (use git-muse --help or git muse help)
-  -V, --version           Show version
+  -V, --version           Show version and executable path
       --proxy <url>       HTTP proxy for LLM requests (http/https targets)
 
 Notes:
+  git muse --version (or git-muse --version) prints the running git-muse.exe path.
   ~/.git-muse.json llm may be one object or an array. Rate-limited (RPM/429)
   requests automatically switch to the next entry.
   git muse --help is handled by Git itself and opens git-muse.html.

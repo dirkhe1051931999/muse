@@ -22,4 +22,7 @@ func TestUsageMentionsGitHelpInterception(t *testing.T) {
 	if !strings.Contains(Usage, "git-muse.html") {
 		t.Fatalf("usage should mention git-muse.html")
 	}
+	if !strings.Contains(Usage, "executable path") {
+		t.Fatalf("usage should mention executable path")
+	}
 }

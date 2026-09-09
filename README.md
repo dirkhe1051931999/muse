@@ -35,7 +35,7 @@ git muse --proxy http://127.0.0.1:7890
 git muse --proxy 127.0.0.1:7890
 ```
 
-说明：`git muse --help` 由 Git 自己处理，会打开 `git-muse.html`；请先运行一次 `git muse init` 安装该页面。日常也可用 `git muse help` 或 `git-muse --help`。
+说明：`git muse --help` 由 Git 自己处理，会打开 `git-muse.html`；请先运行一次 `git muse init` 安装该页面。日常也可用 `git muse help` 或 `git-muse --help`。`git muse help` 和 `git muse --version` 会打印当前正在运行的 `git-muse.exe` 路径。
 
 当前可直接运行：
 
@@ -77,6 +77,8 @@ C:\Users\<you>\bin\git-muse.exe
 git-muse help
 git muse help
 ```
+
+`git muse init` 会写入用户 PATH 并通知资源管理器。已经打开的 Zed / VS Code 仍使用启动时的 PATH，需要整个退出后再开（只关终端标签不够）。
 
 在任意 Git 仓库中使用：
 
