@@ -86,6 +86,25 @@ func TestLoadFileReadsLLMArray(t *testing.T) {
 	}
 }
 
+func TestApplyFileConfigRateLimitRetries(t *testing.T) {
+	var fileCfg fileConfig
+	fileCfg.Failover.RateLimitRetries = 5
+	cfg := Config{RateLimitRetries: 3}
+	applyFileConfig(&cfg, fileCfg)
+	if cfg.RateLimitRetries != 5 {
+		t.Fatalf("RateLimitRetries = %d", cfg.RateLimitRetries)
+	}
+}
+
+func TestNormalizeRateLimitRetries(t *testing.T) {
+	if got := NormalizeRateLimitRetries(0); got != 3 {
+		t.Fatalf("default = %d", got)
+	}
+	if got := NormalizeRateLimitRetries(1); got != 1 {
+		t.Fatalf("one = %d", got)
+	}
+}
+
 func TestInitFileCreatesExample(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
