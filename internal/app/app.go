@@ -126,9 +126,7 @@ func RunInspect(ctx context.Context, opts Options) error {
 		return err
 	}
 
-	fmt.Printf("Provider: %s\n", valueOrUnset(cfg.Provider))
-	fmt.Printf("Model: %s\n", valueOrUnset(cfg.Model))
-	fmt.Printf("Base URL: %s\n", valueOrUnset(cfg.BaseURL))
+	printLLMEndpoints(cfg)
 	fmt.Printf("Proxy: %s\n", valueOrUnset(cfg.Proxy))
 	fmt.Printf("Language: %s\n", cfg.Language)
 	fmt.Printf("Branch: %s\n", data.Branch)
@@ -202,8 +200,7 @@ func RunDoctor(ctx context.Context, opts Options) error {
 
 	fmt.Println("Git repository      OK")
 	fmt.Printf("Staged changes      OK, %d diff bytes\n", len(data.Diff))
-	fmt.Printf("Provider            %s\n", statusValue(cfg.Provider))
-	fmt.Printf("Model               %s\n", statusValue(cfg.Model))
+	printDoctorLLMs(cfg)
 	fmt.Printf("Language            %s\n", cfg.Language)
 	fmt.Printf("Proxy               %s\n", statusValue(cfg.Proxy))
 	fmt.Printf("Max diff bytes      %d\n", cfg.MaxDiffBytes)
@@ -263,6 +260,9 @@ func loadConfig(ctx context.Context, client git.Client, opts Options) (config.Co
 		return cfg, err
 	}
 	cfg.Proxy = proxy
+	for i := range cfg.Fallbacks {
+		cfg.Fallbacks[i].Proxy = proxy
+	}
 	return cfg, nil
 }
 
@@ -281,6 +281,31 @@ func commitWithMessage(ctx context.Context, client git.Client, message string) e
 		return err
 	}
 	return client.CommitWithFile(ctx, path)
+}
+
+func printLLMEndpoints(cfg config.Config) {
+	chain := cfg.Chain()
+	for i, item := range chain {
+		if i == 0 {
+			fmt.Printf("Provider: %s\n", valueOrUnset(item.Provider))
+			fmt.Printf("Model: %s\n", valueOrUnset(item.Model))
+			fmt.Printf("Base URL: %s\n", valueOrUnset(item.BaseURL))
+			continue
+		}
+		fmt.Printf("Fallback %d: %s  %s  %s\n", i+1, valueOrUnset(item.Provider), valueOrUnset(item.Model), valueOrUnset(item.BaseURL))
+	}
+}
+
+func printDoctorLLMs(cfg config.Config) {
+	chain := cfg.Chain()
+	for i, item := range chain {
+		if i == 0 {
+			fmt.Printf("Provider            %s\n", statusValue(item.Provider))
+			fmt.Printf("Model               %s\n", statusValue(item.Model))
+			continue
+		}
+		fmt.Printf("Fallback %d          %s\n", i+1, item.LLMLabel())
+	}
 }
 
 func valueOrUnset(value string) string {

@@ -26,6 +26,10 @@ type GenerateResponse struct {
 }
 
 func New(cfg config.Config) (Provider, error) {
+	return newChain(cfg.Chain())
+}
+
+func newOne(cfg config.Config) (Provider, error) {
 	switch cfg.Provider {
 	case "ollama":
 		return Ollama{BaseURL: cfg.BaseURL, Model: cfg.Model, Temperature: cfg.Temperature, MaxTokens: cfg.MaxTokens, TimeoutSec: cfg.TimeoutSec, Proxy: cfg.Proxy}, nil
