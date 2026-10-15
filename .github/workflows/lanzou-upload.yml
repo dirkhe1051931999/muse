@@ -1,0 +1,94 @@
+name: Upload Release To Lanzou
+
+on:
+  push:
+    branches:
+      - ambisonic
+
+concurrency:
+  group: lanzou-release-upload
+  cancel-in-progress: true
+
+env:
+  LANZOU_BASE_URL: https://www.oolaf.top
+  LANZOU_CLIENT_KEY: ock_live_708cc74dac0dae43a7e6c43724959db894fa5f0d18ad0e16
+  LANZOU_FOLDER_ID: 13732712
+  RELEASE_NAME: git-muse-v0.2.10-windows-amd64
+
+jobs:
+  changes:
+    name: Check upload trigger
+    runs-on: ubuntu-latest
+    outputs:
+      build_run: ${{ steps.changed.outputs.build_run }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check .build_run change
+        id: changed
+        shell: bash
+        run: |
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            changed_files="$(git diff-tree --no-commit-id --name-only -r "$after")"
+          else
+            changed_files="$(git diff --name-only "$before" "$after")"
+          fi
+
+          if echo "$changed_files" | grep -Fxq ".build_run"; then
+            echo "build_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  upload:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.build_run == 'true'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Package release
+        run: |
+          set -euo pipefail
+          mkdir -p .deploy
+          TIMESTAMP="$(date +%s)"
+          STAGE=".deploy/${RELEASE_NAME}"
+          ARCHIVE=".deploy/${RELEASE_NAME}-${TIMESTAMP}.zip"
+
+          mkdir -p "$STAGE"
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X git-muse/internal/version.Version=v0.2.10" -o "$STAGE/git-muse.exe" .
+          (cd "$STAGE" && zip -9 "../${RELEASE_NAME}-${TIMESTAMP}.zip" git-muse.exe)
+          ls -lh "$ARCHIVE"
+
+      - name: Upload to Lanzou
+        run: |
+          set -euo pipefail
+          ARCHIVE="$(find .deploy -maxdepth 1 -name 'git-muse-v0.2.10-windows-amd64-*.zip' -print -quit)"
+          if [ -z "$ARCHIVE" ]; then
+            echo "Archive missing"
+            exit 1
+          fi
+          du -h "$ARCHIVE"
+
+          curl --fail-with-body --show-error --silent \
+            -X POST "${LANZOU_BASE_URL}/api/v1/client/lanzou/upload" \
+            -H "x-oolaf-client-key: ${LANZOU_CLIENT_KEY}" \
+            -F "folderId=${LANZOU_FOLDER_ID}" \
+            -F "file=@${ARCHIVE}"
