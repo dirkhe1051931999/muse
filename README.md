@@ -139,8 +139,6 @@ internal/app/        应用流程编排
 internal/git/        系统 git 封装
 internal/diffctx/    staged diff 上下文收集
 internal/commitmsg/  commit message 候选与渲染
-plan                 技术计划
-AGENTS.md            协作规则
 DESIGN.md            CLI 体验设计
 DEVOPS.md            构建、安装、发布和故障排查
 LOGS.md              更改记录
@@ -295,7 +293,7 @@ make check
 
 ## 发版
 
-CI 每次 push 到 `ambisonic` 都会跑测试，但只有 `.build_run` 变更时才会打包并创建 GitHub Release。
+CI 每次 push 到 `main` 都会跑测试，但只有 `.build_run` 变更时才会打包并创建 GitHub Release。
 
 触发发版：
 
@@ -303,15 +301,13 @@ CI 每次 push 到 `ambisonic` 都会跑测试，但只有 `.build_run` 变更�
 date -u +%Y-%m-%dT%H:%M:%SZ > .build_run
 git add .build_run
 git commit -m "chore: trigger release"
-git push origin ambisonic
+git push origin main
 ```
 
 普通代码提交不会打包。
 
 ## 文档
 
-- `plan`：实现计划和里程碑
-- `AGENTS.md`：工程协作规则
 - `DESIGN.md`：CLI 输出和交互规则
 - `DEVOPS.md`：构建、安装、发布和排障
 - `LOGS.md`：更改记录，只追加

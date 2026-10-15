@@ -187,3 +187,9 @@
 
 1. 限流不再第一次就切模型：每个 LLM 先重试 `failover.rateLimitRetries` 次（默认 3），超过后才请求下一个。
 2. 重试与切换都会在 stderr 打日志；`inspect` / `doctor` / init 示例与 README 补充该配置。
+
+2026-10-15 10:35:00
+
+1. 将 `oolaf` 仓库 `ambisonic` 分支代码迁入独立仓库 `muse`，CI 改为监听 `main`。
+2. 打包发布仍仅在根目录 `.build_run` 变更时执行。
+3. `.gitignore` 忽略 `AGENTS.md` / `AGENT.md`，不再将本地协作规则纳入版本库。

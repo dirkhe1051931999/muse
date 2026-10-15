@@ -3,7 +3,7 @@ name: Upload Release To Lanzou
 on:
   push:
     branches:
-      - ambisonic
+      - main
 
 concurrency:
   group: lanzou-release-upload

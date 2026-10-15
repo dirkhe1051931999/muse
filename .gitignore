@@ -4,6 +4,10 @@
 /coverage.out
 /*.exe
 
+# Local agent rules
+AGENTS.md
+AGENT.md
+
 # Local env and secrets
 .env
 .env.*
