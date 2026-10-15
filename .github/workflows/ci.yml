@@ -3,10 +3,10 @@ name: CI and Release
 on:
   push:
     branches:
-      - ambisonic
+      - main
   pull_request:
     branches:
-      - ambisonic
+      - main
   workflow_dispatch:
 
 permissions:
@@ -84,7 +84,7 @@ jobs:
     needs:
       - ci
       - changes
-    if: github.event_name == 'push' && github.ref == 'refs/heads/ambisonic' && needs.changes.outputs.build_run == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.build_run == 'true'
 
     env:
       CGO_ENABLED: '0'

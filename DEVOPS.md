@@ -90,8 +90,8 @@ git: 'muse' is not a git command
 
 触发：
 
-- push 到 `ambisonic`
-- pull request 到 `ambisonic`
+- push 到 `main`
+- pull request 到 `main`
 - 手动 `workflow_dispatch`
 
 当前 CI 流程：
@@ -100,7 +100,7 @@ git: 'muse' is not a git command
 2. `go test ./...`
 3. 本机构建 smoke binary
 
-push 到 `ambisonic` 且 CI 成功后，只有本次 push 包含 `.build_run` 变更，才会继续执行 release：
+push 到 `main` 且 CI 成功后，只有本次 push 包含 `.build_run` 变更，才会继续执行 release：
 
 1. 读取现有 `vX.Y.Z` tag。
 2. 若当前 commit 已有版本 tag，复用该 tag。
@@ -117,7 +117,7 @@ push 到 `ambisonic` 且 CI 成功后，只有本次 push 包含 `.build_run` �
 date -u +%Y-%m-%dT%H:%M:%SZ > .build_run
 git add .build_run
 git commit -m "chore: trigger release"
-git push origin ambisonic
+git push origin main
 ```
 
 当前构建目标：
