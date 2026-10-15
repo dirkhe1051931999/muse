@@ -10,6 +10,42 @@ git muse
 
 当前状态：MVP 已接入 staged diff、配置、Ollama / OpenAI-compatible provider、生成、确认编辑和 `git commit -F` 提交。
 
+## 快速开始
+
+先把 `git-muse` 放进 `PATH`（或从本仓库 `go build`），然后按下面两步走。
+
+### 1. 第一次配置
+
+运行 `git muse init`，再编辑 `~/.git-muse.json`：填接口、模型、`apiKey`，把 `output.language` 改成 `zh` 可生成中文 commit message。
+
+![第一次配置：git muse init 并编辑 ~/.git-muse.json](docs/init.gif)
+
+```bash
+git muse init
+```
+
+至少改这几项：
+
+| 字段 | 作用 |
+| --- | --- |
+| `llm.baseUrl` / `llm.model` | 你的 OpenAI-compatible 接口和模型，或改成 `ollama` |
+| `llm.apiKey` | 模型密钥 |
+| `llm.proxy` | 需要代理时填写，例如 `http://127.0.0.1:7890` |
+| `output.language` | `zh` 或 `en` |
+
+### 2. 日常使用
+
+只分析已暂存改动。`git add` 之后运行 `git muse`，确认即可提交。
+
+![日常使用：git add 后 git muse 生成并确认提交](docs/usage.gif)
+
+```bash
+git add <files>
+git muse
+```
+
+交互选项：`[c]` 提交、`[p]` 提交并推送、`[e]` 编辑、`[r]` 重新生成、`[q]` 取消。提交前会再问一次 `[y/N]`。
+
 ## 能力目标
 
 - 读取 `git diff --cached`，只分析已暂存改动。

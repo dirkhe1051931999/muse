@@ -193,3 +193,12 @@
 1. 将 `oolaf` 仓库 `ambisonic` 分支代码迁入独立仓库 `muse`，CI 改为监听 `main`。
 2. 打包发布仍仅在根目录 `.build_run` 变更时执行。
 3. `.gitignore` 忽略 `AGENTS.md` / `AGENT.md`，不再将本地协作规则纳入版本库。
+
+2026-10-15 10:40:00
+
+1. 移除蓝奏云上传 GitHub Actions 工作流，发版只保留 GitHub Release。
+
+2026-10-15 10:55:00
+
+1. README 增加「快速开始」，用 GIF 演示 `git muse init` 配置和日常 `git muse` 提交。
+2. 从 Git 历史中删除蓝奏上传工作流文件，避免 client key 继续留在仓库。
