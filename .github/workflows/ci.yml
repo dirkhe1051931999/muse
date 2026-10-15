@@ -1,0 +1,212 @@
+name: CI and Release
+
+on:
+  push:
+    branches:
+      - ambisonic
+  pull_request:
+    branches:
+      - ambisonic
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Check release trigger
+    runs-on: ubuntu-latest
+    outputs:
+      build_run: ${{ steps.changed.outputs.build_run }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check .build_run change
+        id: changed
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "build_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+
+          if [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            changed_files="$(git diff-tree --no-commit-id --name-only -r "$after")"
+          else
+            changed_files="$(git diff --name-only "$before" "$after")"
+          fi
+
+          if echo "$changed_files" | grep -Fxq ".build_run"; then
+            echo "build_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Check format
+        run: test -z "$(find . -name '*.go' -print0 | xargs -0 gofmt -l)"
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build local smoke binary
+        run: go build -trimpath -ldflags "-s -w" -o dist/git-muse .
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs:
+      - ci
+      - changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/ambisonic' && needs.changes.outputs.build_run == 'true'
+
+    env:
+      CGO_ENABLED: '0'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+          cache: true
+
+      - name: Determine release tag
+        id: version
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+
+          $headTags = @(git tag --points-at HEAD --list "v*" | Where-Object { $_ -match '^v\d+\.\d+\.\d+$' })
+          if ($headTags.Count -gt 0) {
+            $tag = $headTags | Sort-Object -Descending | Select-Object -First 1
+            "tag_name=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "create_tag=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            return
+          }
+
+          $versions = @()
+          foreach ($tag in (git tag --list "v*")) {
+            if ($tag -match '^v(\d+)\.(\d+)\.(\d+)$') {
+              $versions += [pscustomobject]@{
+                Tag = $tag
+                Major = [long]$Matches[1]
+                Minor = [long]$Matches[2]
+                Patch = [long]$Matches[3]
+              }
+            }
+          }
+
+          $latest = $versions |
+            Sort-Object -Property Major, Minor, Patch -Descending |
+            Select-Object -First 1
+
+          if ($null -eq $latest) {
+            $major = 0
+            $minor = 1
+            $patch = 1
+          } elseif ($latest.Minor -ge 20) {
+            $major = $latest.Major + 1
+            $minor = 0
+            $patch = 1
+          } elseif ($latest.Patch -ge 10) {
+            $major = $latest.Major
+            $minor = $latest.Minor + 1
+            $patch = 1
+          } else {
+            $major = $latest.Major
+            $minor = $latest.Minor
+            $patch = $latest.Patch + 1
+          }
+
+          $nextTag = "v$major.$minor.$patch"
+          "tag_name=$nextTag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "create_tag=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build release packages
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag_name }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          $targets = @(
+            @{ GOOS = "linux"; GOARCH = "amd64"; Name = "git-muse-$tag-linux-amd64"; Bin = "git-muse"; Archive = "tar.gz" },
+            @{ GOOS = "linux"; GOARCH = "arm64"; Name = "git-muse-$tag-linux-arm64"; Bin = "git-muse"; Archive = "tar.gz" },
+            @{ GOOS = "darwin"; GOARCH = "amd64"; Name = "git-muse-$tag-darwin-amd64"; Bin = "git-muse"; Archive = "tar.gz" },
+            @{ GOOS = "darwin"; GOARCH = "arm64"; Name = "git-muse-$tag-darwin-arm64"; Bin = "git-muse"; Archive = "tar.gz" },
+            @{ GOOS = "windows"; GOARCH = "amd64"; Name = "git-muse-$tag-windows-amd64"; Bin = "git-muse.exe"; Archive = "zip" }
+          )
+
+          foreach ($target in $targets) {
+            $stage = Join-Path "dist" $target.Name
+            New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+            $env:GOOS = $target.GOOS
+            $env:GOARCH = $target.GOARCH
+            go build -trimpath -ldflags "-s -w -X git-muse/internal/version.Version=$tag" -o (Join-Path $stage $target.Bin) .
+            if ($LASTEXITCODE -ne 0) {
+              throw "go build failed for $($target.GOOS)/$($target.GOARCH)"
+            }
+
+            Copy-Item README.md $stage
+            Copy-Item LICENSE* $stage -ErrorAction SilentlyContinue
+
+            if ($target.Archive -eq "zip") {
+              Compress-Archive -Path "$stage/*" -DestinationPath "dist/$($target.Name).zip" -Force
+            } else {
+              tar -czf "dist/$($target.Name).tar.gz" -C $stage .
+            }
+          }
+
+          Get-ChildItem -Path "dist/*.zip", "dist/*.tar.gz" -File |
+            ForEach-Object { sha256sum $_.FullName } |
+            Set-Content -Path dist/checksums.txt -Encoding utf8
+
+      - name: Push release tag
+        if: steps.version.outputs.create_tag == 'true'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag_name }}
+          git push origin ${{ steps.version.outputs.tag_name }}
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag_name }}
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/checksums.txt
+          generate_release_notes: true
